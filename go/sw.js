@@ -1,5 +1,5 @@
 /* Route 웹앱 화면 파일만 저장. 경로·검색 데이터는 항상 실시간 조회 */
-const CACHE='route-v1';
+const CACHE='route-v2';
 const SHELL=['./','./index.html','./config.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-180.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('route-')&&k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
