@@ -10,7 +10,7 @@
    ===================================================================== */
 window.APP_CONFIG = {
   // 네이버 클라우드 › Maps › Application › Client ID (Dynamic Map)
-  NAVER_KEY_ID:  '',
+  NAVER_KEY_ID:  'fk4m66dsb7',
 
   // ODsay LAB › 애플리케이션 › Web 플랫폼 API Key (지하철·버스 경로)
   ODSAY_API_KEY: '',
