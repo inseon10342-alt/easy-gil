@@ -124,6 +124,9 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .exit .lab small{display:block;font-size:16px;font-weight:700;color:var(--muted)}
 .exit.unk .num{background:var(--soft);color:var(--danger);font-size:22px;letter-spacing:0;padding:0 14px}
 .unknown{color:var(--danger);font-weight:800}
+.btn-nmap{background:#03C75A;color:#fff;margin-top:20px;min-height:72px;font-size:22px}
+.btn-nmap:active{background:#02a84c}
+.btn-nmap:disabled{background:var(--soft);color:var(--muted);opacity:1}
 .tip{font-size:17px;color:var(--muted);margin-top:14px}
 
 /* ---------- 도보(지도) ---------- */
@@ -224,6 +227,13 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
   <div class="wpanel"><div class="row"><div class="ic" id="walkIc">↑</div><div class="t" id="walkText"></div></div><div class="s" id="walkSub"></div></div>
   <div id="map"><button class="mapbtn" id="btnMyLoc" type="button">내 위치</button></div>
   <div class="foot"><button class="btn btn-ghost prev" id="walkPrev" type="button">이전</button><button class="btn btn-primary next" id="walkNext" type="button">다음</button></div>
+</section>
+
+<!-- 출구 안내 + 네이버지도 앱 연동 -->
+<section id="exitScr" class="screen hidden">
+  <div class="bar"><div class="ttl">출구에서 목적지까지</div><button class="tbtn closebtn" data-home type="button">닫기</button></div>
+  <div class="main" id="exitBody"></div>
+  <div class="foot"><button class="btn btn-ghost prev" id="exitPrev" type="button">이전</button><button class="btn btn-ghost next" id="exitEnd" type="button">안내 끝내기</button></div>
 </section>
 
 <!-- 운영자 설정 필요 -->
@@ -598,6 +608,7 @@ function buildSteps(p){
   const L=lastT.s;
   const useExit=L.trafficType===1&&hasVal(L.endExitX)&&hasVal(L.endExitY);
   S.walkStart={pos:useExit?{lat:+L.endExitY,lng:+L.endExitX}:{lat:+L.endY,lng:+L.endX},
+    exitPos:useExit?{lat:+L.endExitY,lng:+L.endExitX}:null, stopPos:L.trafficType===2?{lat:+L.endY,lng:+L.endX}:null,
     exitNo:L.trafficType===1&&hasVal(L.endExitNo)?L.endExitNo:null,isSubway:L.trafficType===1,name:L.endName};
   const lw=sp[sp.length-1]; S.walkSeg=lw&&lw.trafficType===3?{dist:lw.distance||0,min:lw.sectionTime||0}:null;
   S.steps=steps;
@@ -678,7 +689,7 @@ function renderSimpleWalk(){
   const info=w.totalDistance!=null?`걷기 약 ${Math.max(1,Math.round(w.totalTime/60))}분 · ${fmtM(w.totalDistance)} · `:'';
   $('#walkSub').textContent=arrived?'':`${info}목적지까지 직선 ${fmtM(straight)}${S.me?'':' (내 위치 확인 전)'}`;
   $('#walkTop').textContent=S.walkWhole?'목적지까지 걷기':startLabel()+' → 목적지';
-  $('#walkPrev').disabled=!arrived;
+  $('#walkPrev').disabled=!arrived&&!canBackToSteps();
   $('#walkNext').textContent=arrived?'안내 끝내기':'도착했어요';
 }
 function renderWalk(){
@@ -694,14 +705,72 @@ function renderWalk(){
   $('#walkText').textContent=text;
   $('#walkSub').textContent=`${S.walkIdx+1}/${n} · 남은 거리 ${fmtM(remainFrom(S.walkIdx))} · 전체 ${fmtM(w.totalDistance)}, 약 ${Math.max(1,Math.round(w.totalTime/60))}분`;
   $('#walkTop').textContent=S.walkWhole?'목적지까지 걷기':startLabel()+' → 목적지';
-  $('#walkPrev').disabled=S.walkIdx===0;
+  $('#walkPrev').disabled=S.walkIdx===0&&!canBackToSteps();
   $('#walkNext').textContent=S.walkIdx===n-1?'안내 끝내기':'다음';
   if(map&&mk.step){ const p=new naver.maps.LatLng(st.pos.lat,st.pos.lng); mk.step.setPosition(p); if(!S.followMe) map.panTo(p); }
 }
-$('#walkPrev').onclick=()=>{ if(S.walkIdx>0){ S.walkIdx--; renderWalk(); } };
-$('#walkNext').onclick=()=>{ if(S.walkIdx<S.walk.steps.length-1){ S.walkIdx++; renderWalk(); return; } if(confirm('길안내를 끝낼까요?')) goHome(); };
+const canBackToSteps=()=>!S.walkWhole&&S.steps&&S.steps.length>0;
+$('#walkPrev').onclick=()=>{
+  if(S.walkIdx>0){ S.walkIdx--; renderWalk(); return; }
+  if(canBackToSteps()){ S.idx=S.steps.length-1; show('step'); renderStep(); }   // 지하철·버스 마지막 단계로
+};
+$('#walkNext').onclick=()=>{ if(S.walk.simple&&S.walkIdx===0){ openExitScreen(); return; } if(S.walkIdx<S.walk.steps.length-1){ S.walkIdx++; renderWalk(); return; } if(confirm('길안내를 끝낼까요?')) goHome(); };
 $('#btnMyLoc').onclick=()=>{ if(!S.me){ toast('내 위치를 찾는 중입니다.','잠시 후 다시 누르세요. 위치 권한이 꺼져 있으면 ‘다음’ 버튼으로 따라가세요.'); return; }
   S.followMe=true; map.setCenter(new naver.maps.LatLng(S.me.lat,S.me.lng)); map.setZoom(18); };
+
+/* ---------- 출구 안내 화면 + 네이버지도 앱 도보 길찾기 ---------- */
+function exitStart(){
+  // 출발점: ODsay가 준 '하차역 실제 출구 좌표'만 사용 (역 중심 좌표는 쓰지 않음)
+  if(S.walkWhole) return S.walkFrom?{pos:S.walkFrom,name:S.originName||'출발지',kind:'origin'}:null;
+  const L=S.walkStart;
+  if(L&&L.exitPos) return {pos:L.exitPos,name:L.name+'역 '+L.exitNo+'번 출구',kind:'exit'};
+  if(L&&!L.isSubway) return {pos:L.stopPos,name:L.name+' 정류장',kind:'stop'};
+  if(S.me) return {pos:S.me,name:'현재 위치',kind:'gps'};
+  return null;
+}
+function openExitScreen(){
+  const st=exitStart(), L=S.walkStart;
+  let h='';
+  if(!S.walkWhole && L && L.isSubway){
+    h+=exitBlock(L.exitNo,'나갈 출구');
+    h+=`<div class="hero" style="margin-top:12px">${L.exitNo?`<em>${esc(L.exitNo)}번 출구</em>로 나오세요`:'역 밖으로 나오세요'}</div>`;
+  } else h+=`<div class="hero">목적지까지 걸어가세요</div>`;
+  h+=`<div class="facts">${!S.walkWhole&&L?fact(L.isSubway?'내린 역':'내린 정류장',esc(L.name)+(L.isSubway?'역':''),true):''}
+    ${fact('목적지',esc(S.dest.name),true)}
+    ${S.walk&&S.walk.totalDistance!=null?fact('걷기','약 '+Math.max(1,Math.round(S.walk.totalTime/60))+'분 · '+fmtM(S.walk.totalDistance)):''}
+    ${fact('길찾기 출발점',st?esc(st.name):UNKNOWN,true)}</div>`;
+  h+=`<button class="btn btn-nmap" id="btnNmap" type="button" ${st?'':'disabled'}>네이버지도로 걷는 길 보기</button>`;
+  h+= st ? `<p class="tip">${st.kind==='gps'?'출구 위치 정보가 없어 <b>현재 위치</b>에서 출발합니다. ':''}네이버지도 앱이 열리면 ${st.kind==='exit'?'출구':'출발점'}에서 목적지까지 걷는 길이 바로 나옵니다. 앱이 없으면 설치 화면으로 이동합니다.</p>`
+         : `<p class="tip">이 역의 출구 위치 정보가 없습니다. 역 밖으로 나와 위치 권한을 허용하면 <b>현재 위치</b>에서 길찾기를 할 수 있습니다.</p>`;
+  $('#exitBody').innerHTML=h; $('#exitBody').scrollTop=0;
+  const b=$('#btnNmap'); if(b) b.onclick=()=>openNaverWalk(exitStart(),S.dest);
+  show('exitScr');
+}
+const NMAP_PKG='com.nhn.android.nmap', NMAP_IOS='https://apps.apple.com/kr/app/id311867728';
+const goUrl=u=>{ if(window.__navTo) window.__navTo(u); else location.href=u; };
+function nmapWalkQuery(st,d){
+  const e=encodeURIComponent;
+  return `slat=${st.pos.lat}&slng=${st.pos.lng}&sname=${e(st.name)}&dlat=${d.pos.lat}&dlng=${d.pos.lng}&dname=${e(d.name)}&appname=${e(location.origin+location.pathname)}`;
+}
+function openNaverWalk(st,d){
+  if(!st){ toast('출발 위치를 알 수 없습니다.','위치 권한을 허용한 뒤 다시 눌러 주세요.'); return; }
+  const q=nmapWalkQuery(st,d), ua=navigator.userAgent;
+  if(/Android/i.test(ua)){
+    // 안드로이드: intent URL → 앱이 없으면 Play 스토어로 자동 이동
+    goUrl(`intent://route/walk?${q}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=${NMAP_PKG};end`);
+  } else if(/iPhone|iPad|iPod/i.test(ua)){
+    // iOS: 앱 호출 후 1.5초 안에 화면이 그대로면 앱 미설치로 보고 설치 안내
+    const t0=Date.now(); let left=false; const onHide=()=>{ left=true; };
+    document.addEventListener('visibilitychange',onHide,{once:true});
+    goUrl(`nmap://route/walk?${q}`);
+    setTimeout(()=>{ if(!left&&!document.hidden&&Date.now()-t0<3000){
+      if(confirm('네이버지도 앱이 없거나 열리지 않았습니다.\n앱 스토어에서 설치하시겠어요?')) goUrl(NMAP_IOS); } },1500);
+  } else {
+    toast('휴대폰에서 이용해 주세요.','네이버지도 앱 길찾기는 휴대폰에서만 열립니다.');
+  }
+}
+$('#exitPrev').onclick=()=>{ show('walk'); renderWalk(); startWatch(); };
+$('#exitEnd').onclick=()=>{ if(confirm('길안내를 끝낼까요?')) goHome(); };
 
 /* ---------- 위치 추적 · 자동 진행 · 경로이탈 재안내 ---------- */
 function startWatch(){ stopWatch(); if(!navigator.geolocation) return;
