@@ -13,7 +13,7 @@ window.APP_CONFIG = {
   NAVER_KEY_ID:  'fk4m66dsb7',
 
   // ODsay LAB › 애플리케이션 › Web 플랫폼 API Key (지하철·버스 경로)
-  ODSAY_API_KEY: '',
+  ODSAY_API_KEY: 'UVg/j6aRIQ+8MX1qRvIdig',
 
   // SK open API › TMAP appKey (장소 검색 · 도보 경로)
   TMAP_APP_KEY:  ''
