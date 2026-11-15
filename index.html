@@ -357,7 +357,9 @@ async function kakaoPoi(keyword,near){
 async function naverGeocode(q){ // 카카오·TMAP 키가 모두 없을 때: 네이버 주소 검색(주소만 가능)
   if(!navigator.onLine) throw new UserError('인터넷이 연결되어 있지 않습니다.','와이파이나 모바일 데이터를 켠 뒤 다시 시도하세요.');
   await loadNaver();
-  if(!naver.maps.Service) throw new UserError('주소 검색 기능을 불러오지 못했습니다.','운영자에게 알려 주세요. (네이버 Geocoding 사용 설정 확인)');
+  // geocoder 서브모듈은 지도 본체보다 늦게 로드됨 → 최대 8초 대기
+  for(let i=0;i<40 && !naver.maps.Service?.geocode;i++) await new Promise(r=>setTimeout(r,200));
+  if(!naver.maps.Service?.geocode) throw new UserError('주소 검색 기능을 불러오지 못했습니다.','운영자에게 알려 주세요. (네이버 Geocoding 사용 설정 확인)');
   return new Promise((res,rej)=>{
     const t=setTimeout(()=>rej(new UserError('주소 검색 응답이 너무 늦습니다.','잠시 후 다시 시도하세요.')),TIMEOUT_MS);
     naver.maps.Service.geocode({query:q},(status,r)=>{
