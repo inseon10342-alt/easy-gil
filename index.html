@@ -122,6 +122,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
   display:flex;align-items:center;justify-content:center;font-size:58px;font-weight:900;letter-spacing:-2px}
 .exit .lab{font-size:26px;font-weight:900;line-height:1.2}
 .exit .lab small{display:block;font-size:16px;font-weight:700;color:var(--muted)}
+.exit.door .num{background:var(--blue);color:#fff;font-size:40px;letter-spacing:-1px;min-width:110px}
+.exit.door .lab{font-size:24px}
 .exit.unk .num{background:var(--soft);color:var(--danger);font-size:22px;letter-spacing:0;padding:0 14px}
 .unknown{color:var(--danger);font-weight:800}
 .btn-nmap{background:#03C75A;color:#fff;margin-top:20px;min-height:72px;font-size:22px}
@@ -604,8 +606,10 @@ function buildSteps(p){
     }
     // 3) 탑승
     if(s.trafficType===1){
+      const fastDoor=!isLast&&hasVal(s.door)?s.door:null;
       steps.push({kick:'지하철 타기',html:`<div class="hero"><em>${esc(s.startName)}역</em>에서<br>${chip(s)} 타세요</div>
         <div class="facts">${fact('타는 방향',hasVal(s.way)?esc(s.way)+' 방면':UNKNOWN)}${fact('내릴 역',esc(s.endName)+'역')}
+        ${fastDoor?fact('빠른 환승 칸',esc(fastDoor)+' <small style="font-size:15px;font-weight:600;color:var(--muted)">('+esc(T[k+1].s.startName)+'역 환승)</small>',true):''}
         ${fact('가는 역 수',s.stationCount+'개 역')}${fact('타는 시간','약 '+s.sectionTime+'분')}</div>`});
       steps.push({kick:'내리기',html:`<div class="hero"><em>${esc(s.endName)}역</em>에서 내리세요</div>
         ${isLast?exitBlock(s.endExitNo,'나갈 출구'):''}
