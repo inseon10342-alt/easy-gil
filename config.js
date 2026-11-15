@@ -15,6 +15,9 @@ window.APP_CONFIG = {
   // ODsay LAB › 애플리케이션 › Web 플랫폼 API Key (지하철·버스 경로)
   ODSAY_API_KEY: 'UVg/j6aRIQ+8MX1qRvIdig',
 
-  // SK open API › TMAP appKey (장소 검색 · 도보 경로)
-  TMAP_APP_KEY:  ''
+  // SK open API › TMAP appKey (장소 검색 · 상세 도보 경로) — 없으면 간단 도보 안내
+  TMAP_APP_KEY:  '',
+
+  // 카카오 developers › JavaScript 키 (TMAP 없을 때 장소 이름 검색용) — 없으면 네이버 주소 검색
+  KAKAO_JS_KEY:  ''
 };

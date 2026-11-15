@@ -128,7 +128,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .wpanel .row{display:flex;gap:12px;align-items:flex-start}
 .wpanel .ic{flex:0 0 auto;width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900}
 .wpanel .t{flex:1;min-width:0;font-size:24px;font-weight:800;line-height:1.3;letter-spacing:-.4px}
-.wpanel .s{font-size:16px;color:#C9D3E3;margin-top:8px;font-weight:600}
+.wpanel .s{font-size:16px;color:#C9D3E3;margin-top:8px;font-weight:600;white-space:pre-line}
 #map{flex:1 1 auto;min-height:180px;background:#E7E5E0;position:relative}
 .mapbtn{position:absolute;right:12px;bottom:12px;z-index:50;min-height:52px;padding:0 14px;border-radius:14px;border:0;background:var(--surface);
   color:var(--navy);font-weight:800;font-size:17px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
@@ -245,7 +245,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 <script src="config.js"></script>
 <script>
 'use strict';
-const CFG = Object.assign({NAVER_KEY_ID:'',ODSAY_API_KEY:'',TMAP_APP_KEY:''}, window.APP_CONFIG||{});
+const CFG = Object.assign({NAVER_KEY_ID:'',ODSAY_API_KEY:'',TMAP_APP_KEY:'',KAKAO_JS_KEY:''}, window.APP_CONFIG||{});
+const HAS_TMAP = !!CFG.TMAP_APP_KEY;   // 없으면 카카오 장소검색 + 간단 도보 안내
 const WALK_LIMIT_MIN = 20, OFFROUTE_M = 35, ARRIVE_M = 20, TIMEOUT_MS = 15000;
 const UNKNOWN = '<span class="unknown">확인 불가</span>';
 
@@ -324,6 +325,50 @@ async function tmapPoi(keyword,near){
     return {name:o.name,addr:road||jibun,pos:front||center,entrance:!!front};
   }).filter(o=>{ const k=o.name+'|'+o.addr; if(!o.pos.lat||!o.pos.lng||seen.has(k)) return false; seen.add(k); return true; });
 }
+let kakaoLoading=null;
+function loadKakao(){
+  if(window.kakao?.maps?.services) return Promise.resolve();
+  if(kakaoLoading) return kakaoLoading;
+  kakaoLoading=new Promise((res,rej)=>{
+    const s=document.createElement('script'), fail=()=>{ kakaoLoading=null; s.remove(); rej(new UserError('장소 검색 서비스를 불러오지 못했습니다.','인터넷 연결을 확인하고 다시 시도하세요. 계속되면 운영자에게 알려 주세요.')); };
+    const t=setTimeout(fail,TIMEOUT_MS);
+    s.src='https://dapi.kakao.com/v2/maps/sdk.js?appkey='+encodeURIComponent(CFG.KAKAO_JS_KEY)+'&libraries=services&autoload=false';
+    s.onload=()=>{ try{ kakao.maps.load(()=>{ clearTimeout(t); window.kakao?.maps?.services?res():fail(); }); }catch(e){ clearTimeout(t); fail(); } };
+    s.onerror=()=>{ clearTimeout(t); fail(); }; document.head.appendChild(s);
+  });
+  return kakaoLoading;
+}
+async function kakaoPoi(keyword,near){
+  if(!navigator.onLine) throw new UserError('인터넷이 연결되어 있지 않습니다.','와이파이나 모바일 데이터를 켠 뒤 다시 시도하세요.');
+  await loadKakao();
+  return new Promise((res,rej)=>{
+    const t=setTimeout(()=>rej(new UserError('장소 검색 응답이 너무 늦습니다.','잠시 후 다시 시도하세요.')),TIMEOUT_MS);
+    const opt={size:15}; if(near){ opt.location=new kakao.maps.LatLng(near.lat,near.lng); }
+    new kakao.maps.services.Places().keywordSearch(keyword,(data,status)=>{
+      clearTimeout(t); const St=kakao.maps.services.Status;
+      if(status===St.ZERO_RESULT) return res([]);
+      if(status!==St.OK) return rej(new UserError('장소 검색에 실패했습니다.','잠시 후 다시 시도하세요. 계속되면 운영자에게 알려 주세요.'));
+      const seen=new Set();
+      res(data.map(d=>({name:d.place_name,addr:d.road_address_name||d.address_name||'',pos:{lat:+d.y,lng:+d.x},entrance:false}))
+        .filter(o=>{ const k=o.name+'|'+o.addr; if(!o.pos.lat||seen.has(k)) return false; seen.add(k); return true; }));
+    },opt);
+  });
+}
+async function naverGeocode(q){ // 카카오·TMAP 키가 모두 없을 때: 네이버 주소 검색(주소만 가능)
+  if(!navigator.onLine) throw new UserError('인터넷이 연결되어 있지 않습니다.','와이파이나 모바일 데이터를 켠 뒤 다시 시도하세요.');
+  await loadNaver();
+  if(!naver.maps.Service) throw new UserError('주소 검색 기능을 불러오지 못했습니다.','운영자에게 알려 주세요. (네이버 Geocoding 사용 설정 확인)');
+  return new Promise((res,rej)=>{
+    const t=setTimeout(()=>rej(new UserError('주소 검색 응답이 너무 늦습니다.','잠시 후 다시 시도하세요.')),TIMEOUT_MS);
+    naver.maps.Service.geocode({query:q},(status,r)=>{
+      clearTimeout(t);
+      if(status!==naver.maps.Service.Status.OK) return rej(new UserError('주소 검색에 실패했습니다.','운영자에게 알려 주세요. (네이버 Geocoding 사용 설정 확인)'));
+      res((r?.v2?.addresses||[]).map(a=>({name:a.roadAddress||a.jibunAddress,addr:a.jibunAddress||'',pos:{lat:+a.y,lng:+a.x},entrance:false})).filter(o=>o.pos.lat));
+    });
+  });
+}
+const SEARCH_MODE=HAS_TMAP?'tmap':(CFG.KAKAO_JS_KEY?'kakao':'naver');
+const searchPlaces=(q,near)=>SEARCH_MODE==='tmap'?tmapPoi(q,near):SEARCH_MODE==='kakao'?kakaoPoi(q,near):naverGeocode(q);
 const ODSAY_ERR={'-98':['출발지와 목적지가 가깝습니다.','걸어서 안내합니다.'],'-99':['대중교통 경로를 찾지 못했습니다.','목적지를 다시 확인하거나 출발지를 바꿔 보세요.'],
   '3':['출발지 근처에 역·정류장이 없습니다.','출발지를 바꿔 보세요.'],'4':['목적지 근처에 역·정류장이 없습니다.','목적지를 다시 확인하세요.'],
   '5':['출발지와 목적지 근처에 역·정류장이 없습니다.','장소를 다시 확인하세요.'],'6':['대중교통 안내가 되지 않는 지역입니다.','다른 목적지를 입력하세요.'],
@@ -435,8 +480,8 @@ async function doSearch(q,mode){
   q=q.trim(); if(!q){ toast('장소 이름을 입력하세요.','예: 서울시청, 강남세브란스병원'); return; }
   if(busy) return; busy=true; pickMode=mode; loading(true,'장소 찾는 중…');
   try{
-    const list=await tmapPoi(q,S.gps||S.origin); loading(false);
-    if(!list.length){ toast('‘'+q+'’ 검색 결과가 없습니다.','글자를 확인하거나 건물 이름·주소로 다시 검색하세요.'); return; }
+    const list=await searchPlaces(q,S.gps||S.origin); loading(false);
+    if(!list.length){ toast('‘'+q+'’ 검색 결과가 없습니다.',SEARCH_MODE==='naver'?'도로명 주소로 입력하세요. 예: 세종대로 110':'글자를 확인하거나 건물 이름·주소로 다시 검색하세요.'); return; }
     if(list.length===1){ busy=false; pick(list[0]); return; }
     $('#resTitle').textContent=mode==='dest'?'목적지 선택':'출발지 선택';
     $('#resList').innerHTML=list.map((o,i)=>`<li><button class="pick" data-i="${i}" type="button"><b>${esc(o.name)}</b><span>${esc(o.addr)}</span></button></li>`).join('');
@@ -464,7 +509,7 @@ async function selectDest(o){
   try{
     let paths;
     try{ paths=await odsayPath(S.origin,o.pos); }
-    catch(e){ if(e.code==='-98'){ busy=false; loading(false); S.steps=[]; S.walkStart=null; await startWalk(S.origin,true); return; } throw e; }
+    catch(e){ if(e.code==='-98'){ busy=false; loading(false); S.steps=[]; S.walkStart=null; S.walkSeg=null; await startWalk(S.origin,true); return; } throw e; }
     const sel=chooseRoutes(paths); loading(false);
     if(!sel){ toast('이 목적지까지 대중교통 경로가 없습니다.','목적지를 다시 확인하거나 출발지를 바꿔 보세요.'); return; }
     Object.assign(S,{route:sel.main,alt:sel.alt,reason:sel.reason,note:sel.note,altChosen:false});
@@ -487,7 +532,7 @@ function renderSummary(){
       ? `<div class="alt"><div class="why"><b>처음 추천: 지하철</b>약 ${fmtMin(a.totalTime)}</div><button class="btn btn-outline" id="btnAlt" type="button">지하철 경로로 돌아가기</button></div>`
       : `<div class="alt"><div class="why"><b>다른 방법 1개</b>${esc(S.reason)} 지하철+버스는 약 ${fmtMin(a.totalTime)}, 내린 뒤 걷기 약 ${lastWalkMin(S.alt)}분입니다.</div><button class="btn btn-outline" id="btnAlt" type="button">지하철+버스로 안내받기</button></div>`;
   }
-  h+=`<p class="credit">경로 ODsay · 장소·도보 TMAP · 지도 NAVER</p>`;
+  h+=`<p class="credit">${{tmap:'경로 ODsay · 장소·도보 TMAP · 지도 NAVER',kakao:'경로 ODsay · 장소 카카오 · 지도 NAVER',naver:'경로 ODsay · 주소·지도 NAVER'}[SEARCH_MODE]}</p>`;
   $('#sumBody').innerHTML=h; $('#sumBody').scrollTop=0;
   const ba=$('#btnAlt'); if(ba) ba.onclick=()=>{ const t=S.route; S.route=S.alt; S.alt=t; S.altChosen=!S.altChosen; renderSummary(); };
 }
@@ -549,6 +594,7 @@ function buildSteps(p){
   const useExit=L.trafficType===1&&hasVal(L.endExitX)&&hasVal(L.endExitY);
   S.walkStart={pos:useExit?{lat:+L.endExitY,lng:+L.endExitX}:{lat:+L.endY,lng:+L.endX},
     exitNo:L.trafficType===1&&hasVal(L.endExitNo)?L.endExitNo:null,isSubway:L.trafficType===1,name:L.endName};
+  const lw=sp[sp.length-1]; S.walkSeg=lw&&lw.trafficType===3?{dist:lw.distance||0,min:lw.sectionTime||0}:null;
   S.steps=steps;
 }
 function renderProg(cur,total){ $('#prog').innerHTML=Array.from({length:total},(_,k)=>`<i class="${k<=cur?'on':''}"></i>`).join(''); }
@@ -572,7 +618,7 @@ function loadNaver(){
   if(naverLoading) return naverLoading;
   naverLoading=new Promise((res,rej)=>{
     const s=document.createElement('script'), fail=()=>{ naverLoading=null; s.remove(); rej(new UserError('지도를 불러오지 못했습니다.','인터넷 연결을 확인하고 다시 시도하세요.')); };
-    s.src='https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId='+encodeURIComponent(CFG.NAVER_KEY_ID);
+    s.src='https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId='+encodeURIComponent(CFG.NAVER_KEY_ID)+'&submodules=geocoder';
     s.onload=()=>window.naver?.maps?res():fail(); s.onerror=fail; document.head.appendChild(s);
     setTimeout(()=>{ if(!window.naver?.maps) fail(); },TIMEOUT_MS);
   });
@@ -587,10 +633,14 @@ async function startWalk(from,whole){
   if(busy) return; busy=true; loading(true,'걷는 길 찾는 중…');
   try{
     await loadNaver();
-    const w=await tmapWalk(from,S.dest.pos,S.dest.name);
+    const w=HAS_TMAP?await tmapWalk(from,S.dest.pos,S.dest.name):simpleWalk(from);
     Object.assign(S,{walk:w,walkFrom:from,walkIdx:0,walkWhole:whole,gpsWarned:false});
     loading(false); show('walk'); drawMap(); renderWalk(); startWatch();
   }catch(e){ loading(false); showErr(e); } finally{ busy=false; }
+}
+function simpleWalk(from){ // TMAP 없을 때: 실제 경로선 없이 출발점·목적지·내 위치·남은 직선거리
+  return {simple:true,line:[from,S.dest.pos],steps:[{pos:from,point:'SP'},{pos:S.dest.pos,point:'EP'}],
+    totalDistance:S.walkSeg?S.walkSeg.dist:null,totalTime:S.walkSeg?S.walkSeg.min*60:null};
 }
 function startLabel(){ if(S.walkWhole) return '출발'; if(S.walkStart.exitNo) return S.walkStart.exitNo+'번 출구'; return S.walkStart.isSubway?S.walkStart.name+'역':S.walkStart.name+' 정류장'; }
 function drawMap(){
@@ -599,7 +649,9 @@ function drawMap(){
     zoomControlOptions:{position:N.Position.TOP_RIGHT,style:N.ZoomControlStyle.SMALL}});
   Object.values(mk).forEach(m=>m&&m.setMap(null)); mk={}; if(poly) poly.setMap(null);
   const path=w.line.map(p=>new N.LatLng(p.lat,p.lng));
-  poly=new N.Polyline({map,path,strokeColor:'#1A5FD6',strokeWeight:8,strokeOpacity:.9,strokeLineCap:'round',strokeLineJoin:'round'});
+  poly=w.simple
+    ? new N.Polyline({map,path,strokeColor:'#1A5FD6',strokeWeight:4,strokeOpacity:.8,strokeStyle:'shortdash'})
+    : new N.Polyline({map,path,strokeColor:'#1A5FD6',strokeWeight:8,strokeOpacity:.9,strokeLineCap:'round',strokeLineJoin:'round'});
   const tag=(txt,bg,fg)=>({content:`<div style="background:${bg};color:${fg||'#fff'};font:800 16px/1.2 sans-serif;padding:7px 10px;border-radius:10px;white-space:nowrap;transform:translate(-50%,-115%);box-shadow:0 1px 3px rgba(0,0,0,.35)">${txt}</div>`,anchor:new N.Point(0,0)});
   mk.start=new N.Marker({map,position:center,icon:tag(esc(startLabel()),S.walkStart?.exitNo&&!S.walkWhole?'#FFD200':'#13294B',S.walkStart?.exitNo&&!S.walkWhole?'#111':'#fff'),zIndex:10});
   mk.dest=new N.Marker({map,position:new N.LatLng(S.dest.pos.lat,S.dest.pos.lng),icon:tag('목적지'+(S.dest.entrance?' 입구':''),'#B42318'),zIndex:11});
@@ -612,7 +664,20 @@ function drawMap(){
 function cleanDesc(d){ return String(d||'').replace(/\s+/g,' ').replace(/ (을|를|에서|으로|로) /g,'$1 ').trim(); }
 function remainFrom(i){ const w=S.walk,p=w.steps[i].pos; let best=0,bd=1e9; w.line.forEach((q,k)=>{ const d=dist(p,q); if(d<bd){bd=d;best=k;} });
   let s=0; for(let k=best;k<w.line.length-1;k++) s+=dist(w.line[k],w.line[k+1]); return s; }
+function renderSimpleWalk(){
+  const w=S.walk, arrived=S.walkIdx===1;
+  const here=S.me||S.walkFrom, straight=dist(here,S.dest.pos);
+  const pre=S.walkWhole?'':(S.walkStart.exitNo?S.walkStart.exitNo+'번 출구로 나와서 ':(S.walkStart.isSubway?'역 밖으로 나와서 (출구 번호 확인 불가) ':'버스에서 내려서 '));
+  $('#walkIc').textContent=arrived?'◎':'↗';
+  $('#walkText').textContent=arrived?'도착했습니다. '+S.dest.name:pre+'지도의 빨간 목적지 쪽으로 걸어가세요';
+  const info=w.totalDistance!=null?`걷기 약 ${Math.max(1,Math.round(w.totalTime/60))}분 · ${fmtM(w.totalDistance)} · `:'';
+  $('#walkSub').textContent=arrived?'':`${info}목적지까지 직선 ${fmtM(straight)}${S.me?'':' (내 위치 확인 전)'}\n※ 좌회전·횡단보도 등 상세 안내 없음. 점선은 방향 표시입니다.`;
+  $('#walkTop').textContent=S.walkWhole?'목적지까지 걷기':startLabel()+' → 목적지';
+  $('#walkPrev').disabled=!arrived;
+  $('#walkNext').textContent=arrived?'안내 끝내기':'도착했어요';
+}
 function renderWalk(){
+  if(S.walk&&S.walk.simple) return renderSimpleWalk();
   const w=S.walk,st=w.steps[S.walkIdx],n=w.steps.length,t=TURN[st.turn]||['↑',''];
   let text=cleanDesc(st.desc);
   if(st.point==='SP'){
@@ -647,6 +712,7 @@ async function onPos(p){
   if(arrow&&dot){ if(h!=null&&!isNaN(h)&&(p.coords.speed||0)>0.3){ arrow.style.display='block'; dot.style.transform=`translate(-50%,-50%) rotate(${h}deg)`; } else arrow.style.display='none'; }
   if(S.followMe) map.panTo(ll);
   const w=S.walk; if(!w) return;
+  if(w.simple){ if(S.walkIdx===0&&dist(me,S.dest.pos)<30){ S.walkIdx=1; if(navigator.vibrate) navigator.vibrate(300); } renderSimpleWalk(); return; }
   const nxt=w.steps[S.walkIdx+1];
   if(nxt&&dist(me,nxt.pos)<Math.max(ARRIVE_M,Math.min(acc,30))){ S.walkIdx++; renderWalk(); if(navigator.vibrate) navigator.vibrate(200); }
   if(dist(me,S.dest.pos)<25&&S.walkIdx<w.steps.length-1){ S.walkIdx=w.steps.length-1; renderWalk(); }
@@ -667,15 +733,18 @@ async function runCheck(){
   const out=[]; const row=(name,ok,msg)=>out.push(`<li><b>${name}</b><span class="${ok?'okc':'ngc'}">${ok?'정상':'실패'}</span> ${esc(msg)}</li>`);
   $('#chkList').innerHTML='<li>점검 중…</li>';
   row('접속 주소',location.protocol==='https:'||location.hostname==='localhost',location.origin+(location.protocol==='https:'?'':' — HTTPS가 아니면 GPS가 작동하지 않습니다'));
-  row('config.js 키 입력',CFG.NAVER_KEY_ID&&CFG.ODSAY_API_KEY&&CFG.TMAP_APP_KEY,`네이버 ${CFG.NAVER_KEY_ID?'있음':'없음'} · ODsay ${CFG.ODSAY_API_KEY?'있음':'없음'} · TMAP ${CFG.TMAP_APP_KEY?'있음':'없음'}`);
+  row('config.js 키 입력',CFG.NAVER_KEY_ID&&CFG.ODSAY_API_KEY,`네이버 ${CFG.NAVER_KEY_ID?'있음':'없음'} · ODsay ${CFG.ODSAY_API_KEY?'있음':'없음'} · TMAP ${CFG.TMAP_APP_KEY?'있음':'없음'} · 카카오 ${CFG.KAKAO_JS_KEY?'있음':'없음'}`);
+  const SN={tmap:'TMAP 장소 검색',kakao:'카카오 장소 검색',naver:'네이버 주소 검색'}[SEARCH_MODE];
   let a,b;
-  try{ const l=await tmapPoi('서울역'); a=l[0]; row('TMAP 장소 검색',!!a,a?`‘서울역’ → ${a.name}`:'결과 없음'); }catch(e){ row('TMAP 장소 검색',false,e.message+' '+e.next); }
-  try{ const l=await tmapPoi('서울시청'); b=l[0]; }catch(e){}
+  const q1=SEARCH_MODE==='naver'?'한강대로 405':'서울역', q2=SEARCH_MODE==='naver'?'세종대로 110':'서울시청';
+  try{ const l=await searchPlaces(q1); a=l[0]; row(SN,!!a,a?`‘${q1}’ → ${a.name}`:'결과 없음'); }catch(e){ row(SN,false,e.message+' '+e.next); }
+  try{ const l=await searchPlaces(q2); b=l[0]; }catch(e){}
   if(a&&b){
     try{ const ps=await odsayPath(a.pos,b.pos); const sel=chooseRoutes(ps); row('ODsay 대중교통 경로',!!sel,sel?`서울역→서울시청 ${sel.main.info.totalTime}분, 후보 ${ps.length}개 중 1개 선정`:'경로 없음'); }
     catch(e){ row('ODsay 대중교통 경로',false,e.message+' '+e.next); }
-    try{ const w=await tmapWalk(a.pos,b.pos,'서울시청'); row('TMAP 도보 경로',true,`${fmtM(w.totalDistance)}, 안내 ${w.steps.length}개`); }
-    catch(e){ row('TMAP 도보 경로',false,e.message+' '+e.next); }
+    if(HAS_TMAP){ try{ const w=await tmapWalk(a.pos,b.pos,'서울시청'); row('TMAP 도보 경로',true,`${fmtM(w.totalDistance)}, 안내 ${w.steps.length}개`); }
+      catch(e){ row('TMAP 도보 경로',false,e.message+' '+e.next); } }
+    else row('도보 안내 방식',true,'TMAP 키 없음 → 간단 안내(지도·출구·목적지·남은 거리). TMAP 키를 넣으면 상세 안내로 자동 전환');
   } else row('경로 점검',false,'장소 검색이 실패해 건너뜀');
   try{ await loadNaver(); row('네이버 지도',true,'불러오기 성공 (인증 실패 시 화면 하단에 별도 안내)'); }catch(e){ row('네이버 지도',false,e.message); }
   try{ await getGps(); row('GPS',true,'현재 위치 확인됨'); }catch(e){ row('GPS',false,e.message); }
@@ -688,8 +757,9 @@ function netState(){ $('#offline').classList.toggle('hidden',navigator.onLine); 
 window.addEventListener('offline',netState); window.addEventListener('online',netState); netState();
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(location.hash==='#check'){ stack.push('check'); show('check',false); runCheck(); }
-else if(!CFG.NAVER_KEY_ID||!CFG.ODSAY_API_KEY||!CFG.TMAP_APP_KEY){ show('noconfig',false); }
-else{ stack.push('home'); try{ history.replaceState({id:'home'},''); }catch(e){} renderRecent(); refreshGps(); }
+else if(!CFG.NAVER_KEY_ID||!CFG.ODSAY_API_KEY){ show('noconfig',false); }
+else{ if(SEARCH_MODE==='naver'){ $('#destInput').placeholder='도로명 주소 입력'; $('#originInput').placeholder='출발지 도로명 주소'; }
+  stack.push('home'); try{ history.replaceState({id:'home'},''); }catch(e){} renderRecent(); refreshGps(); }
 </script>
 </body>
 </html>
