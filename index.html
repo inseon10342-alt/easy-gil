@@ -39,6 +39,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .tbtn{min-height:48px;min-width:48px;padding:0 12px;border:0;background:transparent;border-radius:12px;font-size:18px;font-weight:700;color:var(--navy)}
 .tbtn:active{background:var(--soft)}
 .tbtn.back{font-size:24px;padding:0 10px}
+.tbtn.closebtn{flex:0 0 auto;min-width:72px;margin-right:8px;background:var(--surface);border:2px solid var(--navy);color:var(--navy);font-size:18px;font-weight:800}
+.tbtn.closebtn:active{background:var(--soft)}
 .main{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:4px 20px 20px;-webkit-overflow-scrolling:touch}
 .foot{flex:0 0 auto;display:flex;gap:10px;padding:12px 16px 14px;background:var(--bg);border-top:1px solid var(--line)}
 
@@ -210,7 +212,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 
 <!-- 단계 안내 (텍스트만) -->
 <section id="step" class="screen hidden">
-  <div class="bar"><button class="tbtn" data-home type="button">닫기</button><div class="ttl" id="stepTop"></div></div>
+  <div class="bar"><div class="ttl" id="stepTop"></div><button class="tbtn closebtn" data-home type="button">닫기</button></div>
   <div class="prog" id="prog"></div>
   <div class="main" id="stepBody"></div>
   <div class="foot"><button class="btn btn-ghost prev" id="stepPrev" type="button">이전</button><button class="btn btn-primary next" id="stepNext" type="button">다음</button></div>
@@ -218,7 +220,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 
 <!-- 도보 안내 (지도) -->
 <section id="walk" class="screen hidden">
-  <div class="bar"><button class="tbtn" data-home type="button">닫기</button><div class="ttl" id="walkTop">목적지까지 걷기</div></div>
+  <div class="bar"><div class="ttl" id="walkTop">목적지까지 걷기</div><button class="tbtn closebtn" data-home type="button">닫기</button></div>
   <div class="wpanel"><div class="row"><div class="ic" id="walkIc">↑</div><div class="t" id="walkText"></div></div><div class="s" id="walkSub"></div></div>
   <div id="map"><button class="mapbtn" id="btnMyLoc" type="button">내 위치</button></div>
   <div class="foot"><button class="btn btn-ghost prev" id="walkPrev" type="button">이전</button><button class="btn btn-primary next" id="walkNext" type="button">다음</button></div>
