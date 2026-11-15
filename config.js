@@ -19,5 +19,5 @@ window.APP_CONFIG = {
   TMAP_APP_KEY:  '',
 
   // 카카오 developers › JavaScript 키 (TMAP 없을 때 장소 이름 검색용) — 없으면 네이버 주소 검색
-  KAKAO_JS_KEY:  ''
+  KAKAO_JS_KEY:  '174dc5f077a4d6f7b38f7e0f5956c66f'
 };
