@@ -133,9 +133,6 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .sc-row .v.num{font-size:32px;color:var(--navy)}
 .sc-row .v.sm{font-size:20px;font-weight:800}
 .sc-row .v .chip{font-size:22px;padding:2px 10px;margin:0}
-.pano{margin-top:14px}
-#stopPanoView{width:100%;height:190px;border-radius:12px;overflow:hidden;background:var(--soft)}
-.pano .cap{font-size:14px;color:var(--muted);margin-top:6px}
 .btn-nmap{background:#03C75A;color:#fff;margin-top:20px;min-height:72px;font-size:22px}
 .btn-nmap:active{background:#02a84c}
 .btn-nmap:disabled{background:var(--soft);color:var(--muted);opacity:1}
@@ -673,8 +670,7 @@ function stopCardHtml(b,walkTxt,from){
     <button class="btn btn-nmap" id="btnStopNmap" type="button" ${b.pos?'':'disabled'}>정류장까지 길찾기 (네이버지도)</button>
     <p class="tip">${!b.pos?'정류장 위치 정보가 없어 길찾기를 할 수 없습니다. 정류장 번호 표지판을 찾아 주세요.'
       : from?(from.kind==='exit'?'출구에서 정류장까지 횡단보도를 포함한 걷는 길을 네이버지도 앱으로 안내합니다.':'내린 곳에서 정류장까지 걷는 길을 네이버지도 앱으로 안내합니다.')
-      :'출구 위치 정보가 없어 <b>현재 위치</b>에서 정류장까지 안내합니다.'} 정류장에 도착하면 <b>‘다음’</b>을 누르세요.</p>
-    <div class="pano hidden" id="stopPano"><div id="stopPanoView"></div><div class="cap">정류장 주변 거리 사진 (네이버 거리뷰 · 촬영 시점에 따라 다를 수 있음)</div></div>`;
+      :'출구 위치 정보가 없어 <b>현재 위치</b>에서 정류장까지 안내합니다.'} 정류장에 도착하면 <b>‘다음’</b>을 누르세요.</p>`;
 }
 async function bindStopCard(b,from){
   const btn=$('#btnStopNmap');
@@ -683,26 +679,7 @@ async function bindStopCard(b,from){
     if(!st){ loading(true,'현재 위치 확인 중…'); try{ const g=await getGps(); st={pos:g,name:'현재 위치',kind:'gps'}; }catch(e){ loading(false); showErr(e); return; } loading(false); }
     openNaverWalk(st,{pos:b.pos,name:b.name+' 정류장'});
   };
-  if(b.pos) showStopPano(b.pos);
 }
-async function showStopPano(pos){
-  const box=$('#stopPano'); if(!box||!navigator.onLine) return;
-  try{
-    await loadNaver();
-    for(let i=0;i<40&&!naver.maps.Panorama;i++) await new Promise(r=>setTimeout(r,200));
-    if(!naver.maps.Panorama||!document.getElementById('stopPanoView')) return;
-    const target=new naver.maps.LatLng(pos.lat,pos.lng);
-    const pano=new naver.maps.Panorama('stopPanoView',{position:target,pov:{pan:0,tilt:0,fov:100},
-      aroundControl:false,flightSpot:false,zoomControl:false,logoControl:true});
-    naver.maps.Event.addListener(pano,'pano_status',st=>{
-      if(st!=='OK'){ box.classList.add('hidden'); return; }
-      box.classList.remove('hidden');
-      try{ const c=pano.getLocation().coord, here={lat:c.lat(),lng:c.lng()}; pano.setPov({pan:bearing(here,pos),tilt:0,fov:100}); }catch(e){}
-    });
-  }catch(e){ box.classList.add('hidden'); }
-}
-function bearing(a,b){ const r=x=>x*Math.PI/180, y=Math.sin(r(b.lng-a.lng))*Math.cos(r(b.lat)),
-  x=Math.cos(r(a.lat))*Math.sin(r(b.lat))-Math.sin(r(a.lat))*Math.cos(r(b.lat))*Math.cos(r(b.lng-a.lng)); return (Math.atan2(y,x)*180/Math.PI+360)%360; }
 function renderProg(cur,total){ $('#prog').innerHTML=Array.from({length:total},(_,k)=>`<i class="${k<=cur?'on':''}"></i>`).join(''); }
 function renderStep(){
   const st=S.steps[S.idx], total=S.steps.length+1;
@@ -725,7 +702,7 @@ function loadNaver(){
   if(naverLoading) return naverLoading;
   naverLoading=new Promise((res,rej)=>{
     const s=document.createElement('script'), fail=()=>{ naverLoading=null; s.remove(); rej(new UserError('지도를 불러오지 못했습니다.','인터넷 연결을 확인하고 다시 시도하세요.')); };
-    s.src='https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId='+encodeURIComponent(CFG.NAVER_KEY_ID)+'&submodules=geocoder,panorama';
+    s.src='https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId='+encodeURIComponent(CFG.NAVER_KEY_ID)+'&submodules=geocoder';
     s.onload=()=>window.naver?.maps?res():fail(); s.onerror=fail; document.head.appendChild(s);
     setTimeout(()=>{ if(!window.naver?.maps) fail(); },TIMEOUT_MS);
   });
