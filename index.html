@@ -131,6 +131,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .sc-row .k{flex:0 0 auto;font-size:17px;font-weight:700;color:var(--muted)}
 .sc-row .v{flex:1;min-width:0;text-align:right;font-size:26px;font-weight:900;letter-spacing:-.4px}
 .sc-row .v.num{font-size:32px;color:var(--navy)}
+.sc-hint{font-size:15px;color:var(--muted);padding:6px 0 10px;border-bottom:1px solid var(--line);text-align:right}
 .sc-row .v.sm{font-size:20px;font-weight:800}
 .sc-row .v .chip{font-size:22px;padding:2px 10px;margin:0}
 .btn-nmap{background:#03C75A;color:#fff;margin-top:20px;min-height:72px;font-size:22px}
@@ -637,7 +638,8 @@ function buildSteps(p){
       const l=s.lane?.[0]||{}, bst=busStopInfo(s);
       steps.push({kick:'버스 타기',html:`<div class="hero"><em>${esc(s.startName)}</em> 정류장에서<br>${chip(s)} 타세요</div>
         <div class="facts">${fact('버스 번호',esc(l.busNo||'')+'번')}${hasVal(s.startArsID)?fact('정류장 번호',esc(s.startArsID)):''}
-        ${fact('가는 방향',bst.dir?esc(bst.dir)+' 쪽':UNKNOWN,true)}
+        ${fact('다음 정류장',bst.next?esc(bst.next):UNKNOWN)}
+        ${bst.next?'<div class="sc-hint">정류장 표지판의 다음 정류장과 같은지 확인하세요</div>':''}
         ${fact('내릴 정류장',esc(s.endName),true)}${fact('가는 정류장 수',s.stationCount+'개')}${fact('타는 시간','약 '+s.sectionTime+'분')}</div>`});
       steps.push({kick:'버스 내리기',html:`<div class="hero"><em>${esc(s.endName)}</em> 정류장에서 내리세요</div>
         <div class="facts">${fact('타고 온 버스',esc(l.busNo||'')+'번',true)}</div>
@@ -656,7 +658,7 @@ function busStopInfo(s){
   const l=s.lane?.[0]||{}, st=s.passStopList?.stations||[];
   const nxt=st.length>1?st[1].stationName:null;
   return {name:s.startName, ars:hasVal(s.startArsID)?String(s.startArsID):null, bus:l.busNo||null, seg:s,
-    dir:nxt?('다음 정류장 '+nxt):null, pos:hasVal(s.startX)&&hasVal(s.startY)?{lat:+s.startY,lng:+s.startX}:null};
+    next:nxt||null, pos:hasVal(s.startX)&&hasVal(s.startY)?{lat:+s.startY,lng:+s.startX}:null};
 }
 function stopCardHtml(b,walkTxt,from){
   return `<div class="hero"><em>${esc(b.name)}</em><br>정류장으로 걸어가세요</div>
@@ -664,7 +666,8 @@ function stopCardHtml(b,walkTxt,from){
       <div class="sc-row"><span class="k">정류장</span><span class="v">${esc(b.name)}</span></div>
       <div class="sc-row"><span class="k">정류장 번호</span><span class="v num">${b.ars?esc(b.ars):UNKNOWN}</span></div>
       <div class="sc-row"><span class="k">탈 버스</span><span class="v">${chip(b.seg)}</span></div>
-      <div class="sc-row"><span class="k">가는 방향</span><span class="v sm">${b.dir?esc(b.dir)+' 쪽':UNKNOWN}</span></div>
+      <div class="sc-row"><span class="k">다음 정류장</span><span class="v">${b.next?esc(b.next):UNKNOWN}</span></div>
+      ${b.next?'<div class="sc-hint">정류장 표지판의 다음 정류장과 같은지 확인하세요</div>':''}
       <div class="sc-row"><span class="k">걷기</span><span class="v sm">${walkTxt}</span></div>
     </div>
     <button class="btn btn-nmap" id="btnStopNmap" type="button" ${b.pos?'':'disabled'}>정류장까지 길찾기 (네이버지도)</button>
