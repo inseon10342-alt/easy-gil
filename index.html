@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#F6F5F2">
 <meta name="format-detection" content="telephone=no">
 <meta name="mobile-web-app-capable" content="yes">
@@ -19,7 +19,8 @@
   --r:16px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:pan-x pan-y}
+#map{touch-action:none}
 html,body{height:100%}
 body{font-family:"Pretendard","SamsungOne","Noto Sans KR","Malgun Gothic",system-ui,-apple-system,sans-serif;
   background:var(--bg);color:var(--ink);font-size:19px;line-height:1.45;overflow:hidden;
@@ -673,7 +674,7 @@ function renderSimpleWalk(){
   $('#walkIc').textContent=arrived?'◎':'↗';
   $('#walkText').textContent=arrived?'도착했습니다. '+S.dest.name:pre+'지도의 빨간 목적지 쪽으로 걸어가세요';
   const info=w.totalDistance!=null?`걷기 약 ${Math.max(1,Math.round(w.totalTime/60))}분 · ${fmtM(w.totalDistance)} · `:'';
-  $('#walkSub').textContent=arrived?'':`${info}목적지까지 직선 ${fmtM(straight)}${S.me?'':' (내 위치 확인 전)'}\n※ 좌회전·횡단보도 등 상세 안내 없음. 점선은 방향 표시입니다.`;
+  $('#walkSub').textContent=arrived?'':`${info}목적지까지 직선 ${fmtM(straight)}${S.me?'':' (내 위치 확인 전)'}`;
   $('#walkTop').textContent=S.walkWhole?'목적지까지 걷기':startLabel()+' → 목적지';
   $('#walkPrev').disabled=!arrived;
   $('#walkNext').textContent=arrived?'안내 끝내기':'도착했어요';
@@ -754,6 +755,13 @@ async function runCheck(){
 }
 $('#btnRecheck').onclick=runCheck;
 
+/* ---------- 화면 확대/축소 고정 (지도 안에서는 지도 확대 가능) ---------- */
+(function(){
+  const inMap=e=>e.target&&e.target.closest&&e.target.closest('#map');
+  ['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t,e=>{ if(!inMap(e)) e.preventDefault(); },{passive:false}));
+  document.addEventListener('touchmove',e=>{ if(e.touches&&e.touches.length>1&&!inMap(e)) e.preventDefault(); },{passive:false});
+  let last=0; document.addEventListener('touchend',e=>{ const n=Date.now(); if(n-last<300&&!inMap(e)) e.preventDefault(); last=n; },{passive:false});
+})();
 /* ---------- 연결 상태 · 시작 ---------- */
 function netState(){ $('#offline').classList.toggle('hidden',navigator.onLine); }
 window.addEventListener('offline',netState); window.addEventListener('online',netState); netState();
