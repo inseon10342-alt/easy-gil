@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F6F5F2">
+<meta name="format-detection" content="telephone=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="application-name" content="쉬운 길안내">
+<title>쉬운 길안내</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{
+  --bg:#F6F5F2; --surface:#FFFFFF; --ink:#0E1A2B; --navy:#13294B; --blue:#1A5FD6;
+  --muted:#4A5260; --line:#E2E0DA; --soft:#EDEBE6; --danger:#B42318; --ok:#0F7A3E;
+  --r:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{height:100%}
+body{font-family:"Pretendard","SamsungOne","Noto Sans KR","Malgun Gothic",system-ui,-apple-system,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:19px;line-height:1.45;overflow:hidden;
+  word-break:keep-all;overflow-wrap:anywhere;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.hidden{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ---------- 레이아웃 ---------- */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);
+  height:100vh;height:100dvh;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.bar{flex:0 0 auto;display:flex;align-items:center;gap:6px;min-height:60px;padding:6px 8px 6px 18px}
+.bar .ttl{flex:1;min-width:0;font-size:19px;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .brand{flex:1;font-size:20px;font-weight:800;color:var(--navy);letter-spacing:-.3px}
+.tbtn{min-height:48px;min-width:48px;padding:0 12px;border:0;background:transparent;border-radius:12px;font-size:18px;font-weight:700;color:var(--navy)}
+.tbtn:active{background:var(--soft)}
+.tbtn.back{font-size:24px;padding:0 10px}
+.main{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:4px 20px 20px;-webkit-overflow-scrolling:touch}
+.foot{flex:0 0 auto;display:flex;gap:10px;padding:12px 16px 14px;background:var(--bg);border-top:1px solid var(--line)}
+
+/* ---------- 버튼 ---------- */
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:64px;border-radius:var(--r);
+  border:0;font-size:21px;font-weight:800;padding:8px 14px;letter-spacing:-.2px;text-align:center}
+.btn-primary{background:var(--navy);color:#fff}
+.btn-primary:active{background:#0B1B33}
+.btn-ghost{background:var(--surface);color:var(--ink);border:2px solid var(--line)}
+.btn-outline{background:var(--surface);color:var(--blue);border:2px solid var(--blue)}
+.btn:disabled{opacity:.35}
+.foot .prev{flex:1}
+.foot .next{flex:2}
+
+/* ---------- 홈 ---------- */
+.h-hero{font-size:31px;font-weight:800;letter-spacing:-.6px;line-height:1.25;margin:10px 0 18px;color:var(--ink)}
+.search{display:flex;gap:8px}
+.search input{flex:1;min-width:0;height:68px;border:2px solid var(--navy);border-radius:var(--r);background:var(--surface);
+  padding:0 16px;font-size:22px;font-weight:700;outline:none;-webkit-appearance:none;appearance:none}
+.search input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,95,214,.18)}
+.search input::placeholder{color:#7A808A;font-weight:500}
+.search input::-webkit-search-cancel-button{display:none}
+.search .go{flex:0 0 84px;height:68px;border:0;border-radius:var(--r);background:var(--blue);color:#fff;font-size:20px;font-weight:800}
+.row-origin{display:flex;align-items:center;gap:10px;margin-top:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+.row-origin .k{flex:0 0 auto;font-size:16px;font-weight:700;color:var(--muted);width:42px}
+.row-origin .v{flex:1;min-width:0;font-size:19px;font-weight:700}
+.row-origin .v.warn{color:var(--danger);font-size:17px}
+.row-origin .tbtn{color:var(--blue);border:2px solid var(--line);background:var(--surface)}
+.sec{margin:26px 0 6px;font-size:16px;font-weight:800;color:var(--muted);letter-spacing:.2px}
+.list{list-style:none}
+.list li{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line)}
+.list .pick{flex:1;min-width:0;display:block;text-align:left;border:0;background:transparent;padding:14px 2px;min-height:68px}
+.list .pick:active{background:var(--soft)}
+.list .pick b{display:block;font-size:21px;font-weight:800;letter-spacing:-.3px}
+.list .pick span{display:block;font-size:16px;color:var(--muted);margin-top:2px}
+.list .del{flex:0 0 auto;color:var(--muted);font-size:16px}
+.empty{font-size:17px;color:var(--muted);padding:12px 0}
+.sec-row{display:flex;align-items:center;justify-content:space-between;margin-top:20px}
+.sec-row .sec{margin:0}
+.sec-row .clr{font-size:16px;color:var(--muted)}
+
+/* ---------- 경로 요약 ---------- */
+.s-dest{font-size:19px;font-weight:700;color:var(--muted);margin-top:4px}
+.s-kind{display:inline-block;margin-top:14px;font-size:16px;font-weight:800;color:var(--blue)}
+.s-time{font-size:54px;font-weight:900;letter-spacing:-1.5px;line-height:1.05;color:var(--navy);margin:2px 0 8px}
+.s-time small{font-size:24px;font-weight:800;letter-spacing:-.3px;margin-left:2px}
+.s-meta{font-size:18px;color:var(--muted);font-weight:600}
+.s-meta b{color:var(--ink)}
+.legs{list-style:none;margin:22px 0 6px;position:relative}
+.legs li{position:relative;padding:0 0 18px 30px;font-size:19px;font-weight:700}
+.legs li::before{content:"";position:absolute;left:7px;top:8px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:3px solid var(--c,#888)}
+.legs li::after{content:"";position:absolute;left:12px;top:24px;bottom:2px;width:3px;background:var(--c,#888)}
+.legs li:last-child{padding-bottom:4px}
+.legs li:last-child::after{display:none}
+.legs .st{display:block;font-size:17px;font-weight:600;color:var(--muted);margin-top:2px}
+.chip{display:inline-block;color:#fff;border-radius:7px;padding:1px 8px;font-size:16px;font-weight:800;vertical-align:2px;margin-right:6px;white-space:nowrap}
+.alt{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+.alt .why{font-size:17px;color:var(--muted);margin-bottom:10px}
+.alt .why b{display:block;font-size:18px;color:var(--ink);margin-bottom:2px}
+.credit{font-size:14px;color:#6B717B;margin-top:22px}
+.notice{font-size:17px;color:var(--ink);background:var(--soft);border-radius:12px;padding:10px 12px;margin-top:14px}
+
+/* ---------- 단계 안내 ---------- */
+.prog{flex:0 0 auto;display:flex;gap:4px;padding:0 20px 8px}
+.prog i{flex:1;height:5px;border-radius:3px;background:var(--line)}
+.prog i.on{background:var(--blue)}
+.kick{font-size:17px;font-weight:800;color:var(--blue);margin:8px 0 6px}
+.kick span{color:var(--muted);font-weight:700;margin-left:6px}
+.hero{font-size:33px;font-weight:900;line-height:1.28;letter-spacing:-.8px;margin-bottom:18px}
+.hero em{font-style:normal;color:var(--blue)}
+.hero .chip{margin-right:1px}
+.facts{border-top:2px solid var(--ink)}
+.fact{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.fact .k{flex:0 0 auto;font-size:17px;font-weight:700;color:var(--muted)}
+.fact .v{flex:1;min-width:0;text-align:right;font-size:25px;font-weight:900;letter-spacing:-.4px}
+.fact .v.sm{font-size:20px;font-weight:800}
+.exit{display:flex;align-items:center;gap:14px;margin:18px 0 4px}
+.exit .num{flex:0 0 auto;min-width:96px;height:96px;padding:0 12px;border-radius:20px;background:#FFD200;color:#111;
+  display:flex;align-items:center;justify-content:center;font-size:58px;font-weight:900;letter-spacing:-2px}
+.exit .lab{font-size:26px;font-weight:900;line-height:1.2}
+.exit .lab small{display:block;font-size:16px;font-weight:700;color:var(--muted)}
+.exit.unk .num{background:var(--soft);color:var(--danger);font-size:22px;letter-spacing:0;padding:0 14px}
+.unknown{color:var(--danger);font-weight:800}
+.tip{font-size:17px;color:var(--muted);margin-top:14px}
+
+/* ---------- 도보(지도) ---------- */
+.wpanel{flex:0 0 auto;background:var(--navy);color:#fff;padding:14px 18px 14px}
+.wpanel .row{display:flex;gap:12px;align-items:flex-start}
+.wpanel .ic{flex:0 0 auto;width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900}
+.wpanel .t{flex:1;min-width:0;font-size:24px;font-weight:800;line-height:1.3;letter-spacing:-.4px}
+.wpanel .s{font-size:16px;color:#C9D3E3;margin-top:8px;font-weight:600}
+#map{flex:1 1 auto;min-height:180px;background:#E7E5E0;position:relative}
+.mapbtn{position:absolute;right:12px;bottom:12px;z-index:50;min-height:52px;padding:0 14px;border-radius:14px;border:0;background:var(--surface);
+  color:var(--navy);font-weight:800;font-size:17px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+
+/* ---------- 상태 ---------- */
+.loading{position:fixed;inset:0;z-index:900;background:rgba(246,245,242,.94);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-size:21px;font-weight:800;color:var(--navy)}
+.spin{width:52px;height:52px;border:6px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:sp .9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:14px;right:14px;bottom:calc(98px + env(safe-area-inset-bottom));z-index:999;background:var(--ink);color:#fff;border-radius:14px;
+  padding:14px 16px;font-size:18px;line-height:1.45;white-space:pre-line}
+.toast b{display:block;font-size:19px}
+.offline{position:fixed;top:env(safe-area-inset-top);left:0;right:0;z-index:950;background:var(--danger);color:#fff;text-align:center;font-size:16px;font-weight:800;padding:6px}
+
+/* ---------- 점검(운영자) ---------- */
+.chk li{display:block;padding:14px 0;border-bottom:1px solid var(--line);font-size:18px}
+.chk b{display:block;font-size:19px}
+.chk .okc{color:var(--ok);font-weight:800}.chk .ngc{color:var(--danger);font-weight:800}
+
+@media (max-width:359px){
+  body{font-size:18px}
+  .h-hero{font-size:27px}.hero{font-size:28px}.s-time{font-size:46px}
+  .search .go{flex-basis:72px}.btn{font-size:19px}
+  .exit .num{min-width:80px;height:80px;font-size:48px}
+  .wpanel .t{font-size:21px}
+}
+</style>
+</head>
+<body>
+<div class="offline hidden" id="offline">인터넷 연결 끊김 · 연결되면 다시 시도하세요</div>
+
+<!-- 홈 -->
+<section id="home" class="screen">
+  <div class="bar"><div class="brand">쉬운 길안내</div></div>
+  <div class="main">
+    <h1 class="h-hero">어디로 갈까요?</h1>
+    <form class="search" id="destForm" autocomplete="off" role="search">
+      <label class="sr" for="destInput">목적지</label>
+      <input id="destInput" type="search" enterkeyhint="search" placeholder="목적지 입력">
+      <button class="go" type="submit">검색</button>
+    </form>
+    <div class="row-origin">
+      <div class="k">출발</div><div class="v" id="originText">현재 위치 확인 중…</div>
+      <button class="tbtn" id="btnOrigin" type="button">변경</button>
+    </div>
+    <div id="recentWrap" class="hidden">
+      <div class="sec-row"><div class="sec">최근 검색</div><button class="tbtn clr" id="btnClearAll" type="button">전체 삭제</button></div>
+      <ul class="list" id="recentList"></ul>
+    </div>
+  </div>
+</section>
+
+<!-- 장소 선택 -->
+<section id="results" class="screen hidden">
+  <div class="bar"><button class="tbtn back" data-back aria-label="뒤로">←</button><div class="ttl" id="resTitle">장소 선택</div></div>
+  <div class="main"><div class="sec" style="margin-top:4px">찾는 곳을 누르세요</div><ul class="list" id="resList"></ul></div>
+</section>
+
+<!-- 출발지 -->
+<section id="originScr" class="screen hidden">
+  <div class="bar"><button class="tbtn back" data-back aria-label="뒤로">←</button><div class="ttl">출발지 변경</div></div>
+  <div class="main">
+    <h1 class="h-hero">어디서 출발하세요?</h1>
+    <form class="search" id="originForm" autocomplete="off">
+      <label class="sr" for="originInput">출발지</label>
+      <input id="originInput" type="search" enterkeyhint="search" placeholder="출발지 입력">
+      <button class="go" type="submit">검색</button>
+    </form>
+    <button class="btn btn-ghost" id="btnUseGps" type="button" style="margin-top:14px">현재 위치에서 출발</button>
+  </div>
+</section>
+
+<!-- 경로 요약 -->
+<section id="summary" class="screen hidden">
+  <div class="bar"><button class="tbtn back" data-home aria-label="처음으로">←</button><div class="ttl">추천 경로</div></div>
+  <div class="main" id="sumBody"></div>
+  <div class="foot"><button class="btn btn-primary" id="btnStart" type="button">안내 시작</button></div>
+</section>
+
+<!-- 단계 안내 (텍스트만) -->
+<section id="step" class="screen hidden">
+  <div class="bar"><button class="tbtn" data-home type="button">닫기</button><div class="ttl" id="stepTop"></div></div>
+  <div class="prog" id="prog"></div>
+  <div class="main" id="stepBody"></div>
+  <div class="foot"><button class="btn btn-ghost prev" id="stepPrev" type="button">이전</button><button class="btn btn-primary next" id="stepNext" type="button">다음</button></div>
+</section>
+
+<!-- 도보 안내 (지도) -->
+<section id="walk" class="screen hidden">
+  <div class="bar"><button class="tbtn" data-home type="button">닫기</button><div class="ttl" id="walkTop">목적지까지 걷기</div></div>
+  <div class="wpanel"><div class="row"><div class="ic" id="walkIc">↑</div><div class="t" id="walkText"></div></div><div class="s" id="walkSub"></div></div>
+  <div id="map"><button class="mapbtn" id="btnMyLoc" type="button">내 위치</button></div>
+  <div class="foot"><button class="btn btn-ghost prev" id="walkPrev" type="button">이전</button><button class="btn btn-primary next" id="walkNext" type="button">다음</button></div>
+</section>
+
+<!-- 운영자 설정 필요 -->
+<section id="noconfig" class="screen hidden">
+  <div class="bar"><div class="brand">쉬운 길안내</div></div>
+  <div class="main"><h1 class="h-hero">아직 준비 중입니다</h1>
+    <p style="font-size:19px">운영자가 지도·경로 서비스 설정을 마치면 사용할 수 있습니다.</p>
+    <p class="tip">운영자: config.js 에 API 키를 입력한 뒤 주소 끝에 <b>#check</b> 를 붙여 점검하세요.</p></div>
+</section>
+
+<!-- 운영자 점검 (#check) -->
+<section id="check" class="screen hidden">
+  <div class="bar"><div class="brand">연동 점검 (운영자용)</div></div>
+  <div class="main"><ul class="list chk" id="chkList"></ul>
+    <button class="btn btn-primary" id="btnRecheck" type="button" style="margin-top:18px">다시 점검</button>
+    <button class="btn btn-ghost" type="button" style="margin-top:10px" onclick="location.hash='';location.reload()">앱으로 돌아가기</button></div>
+</section>
+
+<div class="loading hidden" id="loading" role="status"><div class="spin"></div><div id="loadingText">찾는 중…</div></div>
+<div class="toast hidden" id="toast" role="alert"></div>
+
+<script src="config.js"></script>
+<script>
+'use strict';
+const CFG = Object.assign({NAVER_KEY_ID:'',ODSAY_API_KEY:'',TMAP_APP_KEY:''}, window.APP_CONFIG||{});
+const WALK_LIMIT_MIN = 20, OFFROUTE_M = 35, ARRIVE_M = 20, TIMEOUT_MS = 15000;
+const UNKNOWN = '<span class="unknown">확인 불가</span>';
+
+/* ---------- 유틸 ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+function loading(on,text){ $('#loading').classList.toggle('hidden',!on); if(text) $('#loadingText').textContent=text; }
+let toastTimer;
+function toast(title, next, ms=6000){
+  const t=$('#toast'); t.innerHTML = '<b>'+esc(title)+'</b>'+(next?esc(next):'');
+  t.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.add('hidden'),ms);
+}
+$('#toast').onclick=()=>$('#toast').classList.add('hidden');
+function dist(a,b){ const R=6371000,r=x=>x*Math.PI/180,dLat=r(b.lat-a.lat),dLng=r(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(s)); }
+function distToSeg(p,a,b){ const kx=111320*Math.cos(p.lat*Math.PI/180),ky=110540;
+  const ax=(a.lng-p.lng)*kx,ay=(a.lat-p.lat)*ky,bx=(b.lng-p.lng)*kx,by=(b.lat-p.lat)*ky,dx=bx-ax,dy=by-ay,L=dx*dx+dy*dy;
+  let t=L?-(ax*dx+ay*dy)/L:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(ax+t*dx,ay+t*dy); }
+function fmtMin(m){ m=Math.round(m); return m<60 ? m+'분' : Math.floor(m/60)+'시간'+(m%60?' '+m%60+'분':''); }
+function fmtM(m){ m=Math.round(m); return m>=1000?(m/1000).toFixed(1)+'km':m+'m'; }
+function hasVal(v){ return v!=null && v!=='' && v!=='null' && v!=='0' && v!==0; }
+
+/* ---------- 화면 전환 ---------- */
+const stack=[];
+function show(id,push=true){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  $('#'+id).classList.remove('hidden');
+  if(push){ stack.push(id); try{ history.pushState({id},''); }catch(e){} }
+  if(id!=='walk') stopWatch();
+  $('#toast').classList.add('hidden');
+}
+function goHome(){ stack.length=0; show('home'); renderRecent(); }
+function back(){ stack.pop(); const prev=stack.pop()||'home'; if(prev==='walk'||prev==='step'){ goHome(); return; } show(prev); if(prev==='home') renderRecent(); }
+window.addEventListener('popstate',()=>{ const cur=stack[stack.length-1]; if(cur && cur!=='home' && cur!=='check') back(); });
+document.addEventListener('click',e=>{ if(e.target.closest('[data-back]')) back(); if(e.target.closest('[data-home]')) goHome(); });
+
+/* =========================================================
+   공통 네트워크 + 예외 처리
+   ========================================================= */
+class UserError extends Error{ constructor(msg,next){ super(msg); this.next=next||''; } }
+async function net(url,opt={},what='서버'){
+  if(!navigator.onLine) throw new UserError('인터넷이 연결되어 있지 않습니다.','와이파이나 모바일 데이터를 켠 뒤 다시 시도하세요.');
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),TIMEOUT_MS); let r;
+  try{ r=await fetch(url,{...opt,signal:ctl.signal}); }
+  catch(e){
+    if(e.name==='AbortError') throw new UserError(what+' 응답이 너무 늦습니다.','잠시 후 다시 시도하세요.');
+    throw new UserError(what+'에 연결하지 못했습니다.','인터넷 연결을 확인하고 다시 시도하세요.');
+  } finally{ clearTimeout(t); }
+  if(r.status===401||r.status===403) throw new UserError(what+' 사용 권한 오류입니다.','운영자에게 알려 주세요. (API 키·허용 도메인 확인 필요)');
+  if(r.status===429) throw new UserError(what+' 오늘 사용 한도를 넘었습니다.','내일 다시 시도하거나 운영자에게 알려 주세요.');
+  if(r.status>=500) throw new UserError(what+'에 일시적인 문제가 있습니다.','잠시 후 다시 시도하세요.');
+  return r;
+}
+function showErr(e){ if(e instanceof UserError) toast(e.message,e.next); else toast('알 수 없는 오류가 났습니다.','다시 시도해 주세요.'); }
+
+/* =========================================================
+   API (모두 공식 API)
+   ========================================================= */
+async function tmapPoi(keyword,near){
+  const p=new URLSearchParams({version:'1',searchKeyword:keyword,count:'15',reqCoordType:'WGS84GEO',resCoordType:'WGS84GEO',searchtypCd:'A'});
+  if(near){ p.set('centerLat',near.lat); p.set('centerLon',near.lng); }
+  const r=await net('https://apis.openapi.sk.com/tmap/pois?'+p,{headers:{appKey:CFG.TMAP_APP_KEY,Accept:'application/json'}},'장소 검색');
+  if(r.status===204) return [];
+  if(!r.ok) throw new UserError('장소 검색에 실패했습니다.','검색어를 바꿔 다시 시도하세요.');
+  let j; try{ j=await r.json(); }catch(e){ return []; }
+  const seen=new Set();
+  return (j?.searchPoiInfo?.pois?.poi||[]).map(o=>{
+    const front=+o.frontLat&&+o.frontLon?{lat:+o.frontLat,lng:+o.frontLon}:null;
+    const center={lat:+(o.noorLat||o.frontLat),lng:+(o.noorLon||o.frontLon)};
+    const road=o.newAddressList?.newAddress?.[0]?.fullAddressRoad;
+    const jibun=[o.upperAddrName,o.middleAddrName,o.lowerAddrName,o.detailAddrName].filter(Boolean).join(' ')+(o.firstNo&&o.firstNo!=='0'?' '+o.firstNo+(o.secondNo&&o.secondNo!=='0'?'-'+o.secondNo:''):'');
+    return {name:o.name,addr:road||jibun,pos:front||center,entrance:!!front};
+  }).filter(o=>{ const k=o.name+'|'+o.addr; if(!o.pos.lat||!o.pos.lng||seen.has(k)) return false; seen.add(k); return true; });
+}
+const ODSAY_ERR={'-98':['출발지와 목적지가 가깝습니다.','걸어서 안내합니다.'],'-99':['대중교통 경로를 찾지 못했습니다.','목적지를 다시 확인하거나 출발지를 바꿔 보세요.'],
+  '3':['출발지 근처에 역·정류장이 없습니다.','출발지를 바꿔 보세요.'],'4':['목적지 근처에 역·정류장이 없습니다.','목적지를 다시 확인하세요.'],
+  '5':['출발지와 목적지 근처에 역·정류장이 없습니다.','장소를 다시 확인하세요.'],'6':['대중교통 안내가 되지 않는 지역입니다.','다른 목적지를 입력하세요.'],
+  '500':['경로 서버에 일시적인 문제가 있습니다.','잠시 후 다시 시도하세요.']};
+async function odsayPath(from,to){
+  const p=new URLSearchParams({SX:from.lng,SY:from.lat,EX:to.lng,EY:to.lat,OPT:'0',SearchPathType:'0',apiKey:CFG.ODSAY_API_KEY});
+  const r=await net('https://api.odsay.com/v1/api/searchPubTransPathT?'+p,{},'대중교통 경로');
+  let j; try{ j=await r.json(); }catch(e){ throw new UserError('경로 정보를 읽지 못했습니다.','잠시 후 다시 시도하세요.'); }
+  const err=j.error?(Array.isArray(j.error)?j.error[0]:j.error):null;
+  if(err){
+    const code=String(err.code), raw=err.msg||err.message||'';
+    const m=ODSAY_ERR[code]||(/key|auth|인증|ApiKey|uri|domain/i.test(raw)?['경로 서비스 인증 오류입니다.','운영자에게 알려 주세요. (ODsay 키·등록 URI 확인)']:['경로 검색 중 오류가 났습니다.','잠시 후 다시 시도하세요.']);
+    const e=new UserError(m[0],m[1]); e.code=code; throw e;
+  }
+  return j.result?.path||[];
+}
+async function tmapWalk(from,to,toName){
+  const body={startX:String(from.lng),startY:String(from.lat),endX:String(to.lng),endY:String(to.lat),reqCoordType:'WGS84GEO',resCoordType:'WGS84GEO',
+    startName:encodeURIComponent('출발'),endName:encodeURIComponent(toName||'목적지'),searchOption:'0'};
+  const r=await net('https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1&format=json',
+    {method:'POST',headers:{appKey:CFG.TMAP_APP_KEY,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body)},'도보 경로');
+  if(!r.ok) throw new UserError('걷는 길을 찾지 못했습니다.','다시 시도하세요.');
+  let j; try{ j=await r.json(); }catch(e){ throw new UserError('걷는 길 정보를 읽지 못했습니다.','다시 시도하세요.'); }
+  const line=[],steps=[]; let totalDistance=0,totalTime=0;
+  (j.features||[]).forEach(f=>{ const g=f.geometry,pr=f.properties||{};
+    if(g.type==='Point'){ if(pr.totalDistance!=null){ totalDistance=+pr.totalDistance; totalTime=+pr.totalTime; }
+      steps.push({pos:{lat:g.coordinates[1],lng:g.coordinates[0]},turn:+pr.turnType,desc:pr.description||'',point:pr.pointType}); }
+    else if(g.type==='LineString') g.coordinates.forEach(c=>line.push({lat:c[1],lng:c[0]})); });
+  if(!steps.length||line.length<2) throw new UserError('걷는 길을 찾지 못했습니다.','목적지를 다시 확인하세요.');
+  return {line,steps,totalDistance,totalTime};
+}
+
+/* =========================================================
+   경로 선정: 최적 지하철 1개 + 필요시 지하철+버스 대안 1개
+   ========================================================= */
+function score(p){ const i=p.info,tr=Math.max(0,(i.subwayTransitCount||0)+(i.busTransitCount||0)-1); return i.totalTime+tr*7+(i.totalWalk||0)/1000*6; }
+function lastWalkMin(p){ const l=p.subPath[p.subPath.length-1]; return l&&l.trafficType===3?(l.sectionTime||0):0; }
+function sig(p){ return p.subPath.filter(s=>s.trafficType!==3).map(s=>(s.lane?.[0]?.name||s.lane?.[0]?.busNo)+':'+s.startName+'>'+s.endName).join('|'); }
+function chooseRoutes(paths){
+  paths=(paths||[]).filter(p=>p&&p.info&&Array.isArray(p.subPath)&&p.subPath.some(s=>s.trafficType!==3));
+  const by=t=>paths.filter(p=>p.pathType===t).sort((a,b)=>score(a)-score(b));
+  const subway=by(1),mixed=by(3),bus=by(2);
+  const main=subway[0];
+  if(main){
+    let alt=null,reason='';
+    const walk=lastWalkMin(main),m=mixed.find(x=>sig(x)!==sig(main));
+    if(m){
+      if(walk>WALK_LIMIT_MIN && lastWalkMin(m)<walk){ alt=m; reason='지하철역에서 목적지까지 걸어서 약 '+walk+'분 걸립니다.'; }
+      else if(m.info.totalTime+15<main.info.totalTime && m.info.totalTime*1.4<main.info.totalTime){ alt=m; reason='지하철만 타면 많이 돌아갑니다.'; }
+      else if((main.info.subwayTransitCount||0)>=4 && (m.info.subwayTransitCount+m.info.busTransitCount)<main.info.subwayTransitCount){ alt=m; reason='지하철만 타면 갈아타기가 많습니다.'; }
+    }
+    return {main,alt,reason,note:''};
+  }
+  if(mixed[0]) return {main:mixed[0],alt:null,reason:'',note:'지하철만으로 가는 길이 없어 지하철+버스로 안내합니다.'};
+  if(bus[0])   return {main:bus[0],alt:null,reason:'',note:'지하철 경로가 없어 버스로 안내합니다.'};
+  return null;
+}
+
+/* ---------- 노선 ---------- */
+const LINE_COLOR={1:'#0052A4',2:'#00A84D',3:'#EF7C1C',4:'#00A5DE',5:'#996CAC',6:'#CD7C2F',7:'#747F00',8:'#E6186C',9:'#BDB092',
+  100:'#F5A200',101:'#0090D2',104:'#77C4A3',107:'#0065B3',108:'#6789CA',109:'#D4003B',110:'#FDA600',112:'#81A914',113:'#B7C452',114:'#8FC31F',115:'#B0CE18',116:'#F5A200'};
+const BUS_COLOR='#3D8B37';
+function shortLine(n){ return String(n||'').replace(/^(수도권|부산|대구|광주|대전)\s*/,''); }
+function segColor(s){ return s.trafficType===1?(LINE_COLOR[s.lane?.[0]?.subwayCode]||'#555'):BUS_COLOR; }
+function lineName(s){ const l=s.lane?.[0]||{}; return s.trafficType===1?(shortLine(l.name)||'지하철'):(l.busNo?l.busNo+'번 버스':'버스'); }
+function chip(s){ return `<span class="chip" style="background:${segColor(s)}">${esc(lineName(s))}</span>`; }
+
+/* =========================================================
+   상태 / GPS
+   ========================================================= */
+const S={origin:null,originName:'현재 위치',gps:null,gpsErr:'',dest:null,route:null,alt:null,reason:'',note:'',steps:[],idx:0,walk:null,walkIdx:0};
+function getGps(){ return new Promise((res,rej)=>{
+  if(!navigator.geolocation) return rej(new UserError('이 브라우저는 위치 기능을 지원하지 않습니다.','출발지를 직접 입력하세요.'));
+  navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy}),
+    e=>rej(e.code===1?new UserError('위치 권한이 꺼져 있습니다.','브라우저 설정에서 위치를 허용하거나, ‘변경’을 눌러 출발지를 입력하세요.')
+                    :new UserError('현재 위치를 찾지 못했습니다.','실외로 이동하거나 ‘변경’을 눌러 출발지를 입력하세요.')),
+    {enableHighAccuracy:true,timeout:15000,maximumAge:10000}); }); }
+async function refreshGps(){
+  const el=$('#originText'); el.classList.remove('warn'); el.textContent='현재 위치 확인 중…';
+  try{ S.gps=await getGps(); S.gpsErr=''; if(S.originName==='현재 위치'){ S.origin=S.gps; } el.textContent=S.originName==='현재 위치'?'현재 위치':S.originName; }
+  catch(e){ S.gpsErr=e; if(S.originName==='현재 위치'){ S.origin=null; el.classList.add('warn'); el.textContent=e.message; } }
+}
+
+/* =========================================================
+   홈 / 검색
+   ========================================================= */
+/* ---------- 최근 검색 (최대 3개, 장소명+주소 기준 중복 없음) ---------- */
+const RECENT_KEY='recent', RECENT_MAX=3;
+const recentKey=o=>(String(o.name||'').trim()+'|'+String(o.addr||'').trim()).replace(/\s+/g,' ');
+function getRecent(){ const a=store.get(RECENT_KEY,[]); return Array.isArray(a)?a.filter(o=>o&&o.name&&o.pos):[]; }
+function addRecent(o){
+  const k=recentKey(o), list=getRecent().filter(x=>recentKey(x)!==k);
+  list.unshift({name:o.name,addr:o.addr||'',pos:o.pos,entrance:!!o.entrance});
+  store.set(RECENT_KEY,list.slice(0,RECENT_MAX));
+}
+function renderRecent(){
+  const list=getRecent();
+  $('#recentWrap').classList.toggle('hidden',!list.length);
+  $('#recentList').innerHTML=list.map((f,i)=>`<li><button class="pick" data-rc="${i}" type="button"><b>${esc(f.name)}</b><span>${esc(f.addr)}</span></button><button class="tbtn del" data-rd="${i}" type="button" aria-label="${esc(f.name)} 기록 삭제">삭제</button></li>`).join('');
+}
+$('#recentList').addEventListener('click',e=>{
+  const g=e.target.closest('[data-rc]'),d=e.target.closest('[data-rd]'),list=getRecent();
+  if(g) selectDest(list[+g.dataset.rc]);
+  if(d){ list.splice(+d.dataset.rd,1); store.set(RECENT_KEY,list); renderRecent(); }
+});
+$('#btnClearAll').onclick=()=>{ if(confirm('최근 검색 기록을 모두 삭제할까요?')){ store.set(RECENT_KEY,[]); renderRecent(); } };
+let pickMode='dest', busy=false;
+async function doSearch(q,mode){
+  q=q.trim(); if(!q){ toast('장소 이름을 입력하세요.','예: 서울시청, 강남세브란스병원'); return; }
+  if(busy) return; busy=true; pickMode=mode; loading(true,'장소 찾는 중…');
+  try{
+    const list=await tmapPoi(q,S.gps||S.origin); loading(false);
+    if(!list.length){ toast('‘'+q+'’ 검색 결과가 없습니다.','글자를 확인하거나 건물 이름·주소로 다시 검색하세요.'); return; }
+    if(list.length===1){ busy=false; pick(list[0]); return; }
+    $('#resTitle').textContent=mode==='dest'?'목적지 선택':'출발지 선택';
+    $('#resList').innerHTML=list.map((o,i)=>`<li><button class="pick" data-i="${i}" type="button"><b>${esc(o.name)}</b><span>${esc(o.addr)}</span></button></li>`).join('');
+    $('#resList').onclick=e=>{ const b=e.target.closest('[data-i]'); if(b) pick(list[+b.dataset.i]); };
+    show('results');
+  }catch(e){ loading(false); showErr(e); } finally{ busy=false; }
+}
+function pick(o){
+  if(pickMode==='dest') selectDest(o);
+  else{ S.origin=o.pos; S.originName=o.name; const el=$('#originText'); el.classList.remove('warn'); el.textContent=o.name; goHome(); }
+}
+$('#destForm').addEventListener('submit',e=>{ e.preventDefault(); $('#destInput').blur(); doSearch($('#destInput').value,'dest'); });
+$('#originForm').addEventListener('submit',e=>{ e.preventDefault(); $('#originInput').blur(); doSearch($('#originInput').value,'origin'); });
+$('#btnOrigin').onclick=()=>show('originScr');
+$('#btnUseGps').onclick=async()=>{ S.originName='현재 위치'; S.origin=null; goHome(); await refreshGps(); if(S.gpsErr) showErr(S.gpsErr); };
+
+/* =========================================================
+   경로 찾기
+   ========================================================= */
+async function selectDest(o){
+  if(busy||!o) return; S.dest=o; addRecent(o); renderRecent();
+  if(!S.origin){ loading(true,'현재 위치 확인 중…'); await refreshGps(); loading(false);
+    if(!S.origin){ goHome(); showErr(S.gpsErr||new UserError('출발지를 알 수 없습니다.','‘변경’을 눌러 출발지를 입력하세요.')); return; } }
+  busy=true; loading(true,'가장 좋은 길 찾는 중…');
+  try{
+    let paths;
+    try{ paths=await odsayPath(S.origin,o.pos); }
+    catch(e){ if(e.code==='-98'){ busy=false; loading(false); S.steps=[]; S.walkStart=null; await startWalk(S.origin,true); return; } throw e; }
+    const sel=chooseRoutes(paths); loading(false);
+    if(!sel){ toast('이 목적지까지 대중교통 경로가 없습니다.','목적지를 다시 확인하거나 출발지를 바꿔 보세요.'); return; }
+    Object.assign(S,{route:sel.main,alt:sel.alt,reason:sel.reason,note:sel.note,altChosen:false});
+    renderSummary(); show('summary');
+  }catch(e){ loading(false); showErr(e); } finally{ busy=false; }
+}
+function renderSummary(){
+  const p=S.route,i=p.info,tr=Math.max(0,(i.subwayTransitCount||0)+(i.busTransitCount||0)-1);
+  const kind=p.pathType===1?'지하철':p.pathType===3?'지하철 + 버스':'버스';
+  const legs=p.subPath.filter(s=>s.trafficType!==3);
+  let h=`<div class="s-dest">${esc(S.dest.name)}까지</div>
+    <div class="s-kind">${kind}</div>
+    <div class="s-time">${Math.round(i.totalTime)}<small>분</small></div>
+    <div class="s-meta">갈아타기 <b>${tr}번</b> · 걷기 <b>${fmtM(i.totalWalk||0)}</b>${i.payment?` · <b>${i.payment.toLocaleString()}원</b>`:''}</div>
+    <ul class="legs">${legs.map(s=>`<li style="--c:${segColor(s)}">${chip(s)}<span class="st">${esc(s.startName)} → ${esc(s.endName)}</span></li>`).join('')}</ul>`;
+  if(S.note) h+=`<div class="notice">${esc(S.note)}</div>`;
+  if(S.alt){
+    const a=S.alt.info;
+    h+= S.altChosen
+      ? `<div class="alt"><div class="why"><b>처음 추천: 지하철</b>약 ${fmtMin(a.totalTime)}</div><button class="btn btn-outline" id="btnAlt" type="button">지하철 경로로 돌아가기</button></div>`
+      : `<div class="alt"><div class="why"><b>다른 방법 1개</b>${esc(S.reason)} 지하철+버스는 약 ${fmtMin(a.totalTime)}, 내린 뒤 걷기 약 ${lastWalkMin(S.alt)}분입니다.</div><button class="btn btn-outline" id="btnAlt" type="button">지하철+버스로 안내받기</button></div>`;
+  }
+  h+=`<p class="credit">경로 ODsay · 장소·도보 TMAP · 지도 NAVER</p>`;
+  $('#sumBody').innerHTML=h; $('#sumBody').scrollTop=0;
+  const ba=$('#btnAlt'); if(ba) ba.onclick=()=>{ const t=S.route; S.route=S.alt; S.alt=t; S.altChosen=!S.altChosen; renderSummary(); };
+}
+$('#btnStart').onclick=()=>{ buildSteps(S.route); S.idx=0; renderStep(); show('step'); };
+
+/* =========================================================
+   단계 구성 (지하철·버스 이동 중 = 텍스트만)
+   ========================================================= */
+const fact=(k,v,sm)=>`<div class="fact"><div class="k">${k}</div><div class="v${sm?' sm':''}">${v}</div></div>`;
+const exitBlock=(no,label)=> hasVal(no)
+  ? `<div class="exit"><div class="num">${esc(no)}</div><div class="lab">번 출구<small>${label}</small></div></div>`
+  : `<div class="exit unk"><div class="num">확인 불가</div><div class="lab"><small>${label}</small>출구 번호 정보 없음</div></div>`;
+function buildSteps(p){
+  const sp=p.subPath, steps=[];
+  const T=sp.map((s,i)=>({s,i})).filter(o=>o.s.trafficType!==3);
+  const lastT=T[T.length-1];
+  T.forEach((o,k)=>{
+    const s=o.s, i=o.i, prevT=k>0?T[k-1].s:null, walkBefore=sp[i-1]&&sp[i-1].trafficType===3?sp[i-1]:null, isLast=k===T.length-1;
+    // 1) 처음: 역/정류장까지 걷기
+    if(k===0){
+      const target=s.trafficType===1?s.startName+'역':s.startName+' 정류장';
+      steps.push({kick:'걸어가기',html:`<div class="hero"><em>${esc(target)}</em>까지 걸어가세요</div>
+        <div class="facts">${fact('걷는 시간',walkBefore?'약 '+(walkBefore.sectionTime||0)+'분':UNKNOWN)}${fact('거리',walkBefore?fmtM(walkBefore.distance||0):UNKNOWN)}</div>
+        ${s.trafficType===1&&hasVal(s.startExitNo)?exitBlock(s.startExitNo,'들어갈 출구'):''}`});
+    } else {
+      // 2) 환승
+      if(s.trafficType===1){
+        steps.push({kick:'갈아타기',html:`<div class="hero"><em>${esc(s.startName)}역</em>에서<br>${chip(s)}으로 갈아타세요</div>
+          <div class="facts">${fact('갈아타는 역',esc(s.startName)+'역')}${fact('갈아탈 노선',esc(lineName(s)))}
+          ${fact('갈아타며 걷기',walkBefore?'약 '+(walkBefore.sectionTime||0)+'분 · '+fmtM(walkBefore.distance||0):UNKNOWN,true)}
+          ${prevT.trafficType===1&&hasVal(prevT.door)?fact('빠른 환승 칸',esc(prevT.door)):''}</div>
+          <p class="tip">‘${esc(lineName(s))}’ 갈아타는 곳 표지판을 따라가세요.</p>`});
+      } else {
+        steps.push({kick:'정류장으로',html:`<div class="hero"><em>${esc(s.startName)}</em> 정류장으로 가세요</div>
+          ${prevT.trafficType===1?exitBlock(prevT.endExitNo,'나갈 출구'):''}
+          <div class="facts">${fact('걷는 시간',walkBefore?'약 '+(walkBefore.sectionTime||0)+'분 · '+fmtM(walkBefore.distance||0):UNKNOWN,true)}</div>`});
+      }
+    }
+    // 3) 탑승
+    if(s.trafficType===1){
+      steps.push({kick:'지하철 타기',html:`<div class="hero"><em>${esc(s.startName)}역</em>에서<br>${chip(s)} 타세요</div>
+        <div class="facts">${fact('타는 방향',hasVal(s.way)?esc(s.way)+' 방면':UNKNOWN)}${fact('내릴 역',esc(s.endName)+'역')}
+        ${fact('가는 역 수',s.stationCount+'개 역')}${fact('타는 시간','약 '+s.sectionTime+'분')}</div>`});
+      steps.push({kick:'내리기',html:`<div class="hero"><em>${esc(s.endName)}역</em>에서 내리세요</div>
+        ${isLast?exitBlock(s.endExitNo,'나갈 출구'):''}
+        <div class="facts">${fact('타고 온 노선',esc(lineName(s)),true)}</div>
+        ${isLast?'<p class="tip">다음 화면부터 출구에서 목적지까지 지도로 안내합니다.</p>':''}`});
+    } else {
+      const l=s.lane?.[0]||{};
+      steps.push({kick:'버스 타기',html:`<div class="hero"><em>${esc(s.startName)}</em> 정류장에서<br>${chip(s)} 타세요</div>
+        <div class="facts">${fact('버스 번호',esc(l.busNo||'')+'번')}${hasVal(s.startArsID)?fact('정류장 번호',esc(s.startArsID)):''}
+        ${fact('내릴 정류장',esc(s.endName),true)}${fact('가는 정류장 수',s.stationCount+'개')}${fact('타는 시간','약 '+s.sectionTime+'분')}</div>`});
+      steps.push({kick:'버스 내리기',html:`<div class="hero"><em>${esc(s.endName)}</em> 정류장에서 내리세요</div>
+        <div class="facts">${fact('타고 온 버스',esc(l.busNo||'')+'번',true)}</div>
+        ${isLast?'<p class="tip">다음 화면부터 목적지까지 지도로 안내합니다.</p>':''}`});
+    }
+  });
+  const L=lastT.s;
+  const useExit=L.trafficType===1&&hasVal(L.endExitX)&&hasVal(L.endExitY);
+  S.walkStart={pos:useExit?{lat:+L.endExitY,lng:+L.endExitX}:{lat:+L.endY,lng:+L.endX},
+    exitNo:L.trafficType===1&&hasVal(L.endExitNo)?L.endExitNo:null,isSubway:L.trafficType===1,name:L.endName};
+  S.steps=steps;
+}
+function renderProg(cur,total){ $('#prog').innerHTML=Array.from({length:total},(_,k)=>`<i class="${k<=cur?'on':''}"></i>`).join(''); }
+function renderStep(){
+  const st=S.steps[S.idx], total=S.steps.length+1;
+  $('#stepTop').textContent=`${S.idx+1} / ${total} 단계`;
+  renderProg(S.idx,total);
+  $('#stepBody').innerHTML=`<div class="kick">${st.kick}</div>`+st.html; $('#stepBody').scrollTop=0;
+  $('#stepPrev').disabled=S.idx===0;
+  $('#stepNext').textContent=S.idx===S.steps.length-1?'지도로 걷기 안내':'다음';
+}
+$('#stepPrev').onclick=()=>{ if(S.idx>0){ S.idx--; renderStep(); } };
+$('#stepNext').onclick=async()=>{ if(S.idx<S.steps.length-1){ S.idx++; renderStep(); return; } await startWalk(S.walkStart.pos,false); };
+
+/* =========================================================
+   도보 안내 (지도는 이 화면에서만 표시)
+   ========================================================= */
+let map=null,mk={},poly=null,watchId=null,offCount=0,lastReroute=0,naverLoading=null;
+function loadNaver(){
+  if(window.naver?.maps) return Promise.resolve();
+  if(naverLoading) return naverLoading;
+  naverLoading=new Promise((res,rej)=>{
+    const s=document.createElement('script'), fail=()=>{ naverLoading=null; s.remove(); rej(new UserError('지도를 불러오지 못했습니다.','인터넷 연결을 확인하고 다시 시도하세요.')); };
+    s.src='https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId='+encodeURIComponent(CFG.NAVER_KEY_ID);
+    s.onload=()=>window.naver?.maps?res():fail(); s.onerror=fail; document.head.appendChild(s);
+    setTimeout(()=>{ if(!window.naver?.maps) fail(); },TIMEOUT_MS);
+  });
+  return naverLoading;
+}
+window.navermap_authFailure=()=>toast('지도 인증에 실패했습니다.','운영자에게 알려 주세요. (네이버 Client ID·서비스 URL 확인)',9000);
+const TURN={11:['↑','직진'],12:['←','좌회전'],13:['→','우회전'],14:['↩','유턴'],16:['↙','8시 방향'],17:['↖','10시 방향'],18:['↗','2시 방향'],19:['↘','4시 방향'],
+  125:['⇡','육교'],126:['⇣','지하보도'],127:['⇞','계단'],128:['⤴','경사로'],129:['⇞','계단·경사로'],
+  211:['⇆','횡단보도'],212:['⇆','왼쪽 횡단보도'],213:['⇆','오른쪽 횡단보도'],214:['⇆','횡단보도'],215:['⇆','횡단보도'],216:['⇆','횡단보도'],217:['⇆','횡단보도'],
+  218:['⇕','엘리베이터'],200:['●','출발'],201:['◎','도착']};
+async function startWalk(from,whole){
+  if(busy) return; busy=true; loading(true,'걷는 길 찾는 중…');
+  try{
+    await loadNaver();
+    const w=await tmapWalk(from,S.dest.pos,S.dest.name);
+    Object.assign(S,{walk:w,walkFrom:from,walkIdx:0,walkWhole:whole,gpsWarned:false});
+    loading(false); show('walk'); drawMap(); renderWalk(); startWatch();
+  }catch(e){ loading(false); showErr(e); } finally{ busy=false; }
+}
+function startLabel(){ if(S.walkWhole) return '출발'; if(S.walkStart.exitNo) return S.walkStart.exitNo+'번 출구'; return S.walkStart.isSubway?S.walkStart.name+'역':S.walkStart.name+' 정류장'; }
+function drawMap(){
+  const N=naver.maps,w=S.walk,center=new N.LatLng(S.walkFrom.lat,S.walkFrom.lng);
+  if(!map) map=new N.Map('map',{center,zoom:17,scaleControl:false,logoControl:true,mapDataControl:false,zoomControl:true,
+    zoomControlOptions:{position:N.Position.TOP_RIGHT,style:N.ZoomControlStyle.SMALL}});
+  Object.values(mk).forEach(m=>m&&m.setMap(null)); mk={}; if(poly) poly.setMap(null);
+  const path=w.line.map(p=>new N.LatLng(p.lat,p.lng));
+  poly=new N.Polyline({map,path,strokeColor:'#1A5FD6',strokeWeight:8,strokeOpacity:.9,strokeLineCap:'round',strokeLineJoin:'round'});
+  const tag=(txt,bg,fg)=>({content:`<div style="background:${bg};color:${fg||'#fff'};font:800 16px/1.2 sans-serif;padding:7px 10px;border-radius:10px;white-space:nowrap;transform:translate(-50%,-115%);box-shadow:0 1px 3px rgba(0,0,0,.35)">${txt}</div>`,anchor:new N.Point(0,0)});
+  mk.start=new N.Marker({map,position:center,icon:tag(esc(startLabel()),S.walkStart?.exitNo&&!S.walkWhole?'#FFD200':'#13294B',S.walkStart?.exitNo&&!S.walkWhole?'#111':'#fff'),zIndex:10});
+  mk.dest=new N.Marker({map,position:new N.LatLng(S.dest.pos.lat,S.dest.pos.lng),icon:tag('목적지'+(S.dest.entrance?' 입구':''),'#B42318'),zIndex:11});
+  mk.step=new N.Marker({map,position:center,zIndex:15,icon:{content:'<div style="width:20px;height:20px;border-radius:50%;background:#fff;border:5px solid #13294B;transform:translate(-50%,-50%)"></div>',anchor:new N.Point(0,0)}});
+  mk.me=new N.Marker({map,position:center,visible:false,zIndex:20,icon:{content:'<div id="meDot" style="width:24px;height:24px;border-radius:50%;background:#1A5FD6;border:4px solid #fff;box-shadow:0 0 0 6px rgba(26,95,214,.22);transform:translate(-50%,-50%);position:relative"><div id="meArrow" style="display:none;position:absolute;left:50%;top:-17px;transform:translateX(-50%);border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:13px solid #1A5FD6"></div></div>',anchor:new N.Point(0,0)}});
+  const b=new N.LatLngBounds(path[0],path[0]); path.forEach(p=>b.extend(p));
+  const fit=()=>map.fitBounds(b,{top:50,right:50,bottom:70,left:50}); fit();
+  setTimeout(()=>{ try{ N.Event.trigger(map,'resize'); fit(); }catch(e){} },300);
+}
+function cleanDesc(d){ return String(d||'').replace(/\s+/g,' ').replace(/ (을|를|에서|으로|로) /g,'$1 ').trim(); }
+function remainFrom(i){ const w=S.walk,p=w.steps[i].pos; let best=0,bd=1e9; w.line.forEach((q,k)=>{ const d=dist(p,q); if(d<bd){bd=d;best=k;} });
+  let s=0; for(let k=best;k<w.line.length-1;k++) s+=dist(w.line[k],w.line[k+1]); return s; }
+function renderWalk(){
+  const w=S.walk,st=w.steps[S.walkIdx],n=w.steps.length,t=TURN[st.turn]||['↑',''];
+  let text=cleanDesc(st.desc);
+  if(st.point==='SP'){
+    const pre=S.walkWhole?'':(S.walkStart.exitNo?S.walkStart.exitNo+'번 출구로 나와서 ':(S.walkStart.isSubway?'역 밖으로 나와서 (출구 번호 확인 불가) ':'버스에서 내려서 '));
+    text=pre+text;
+  }
+  if(st.point==='EP') text='도착했습니다. '+S.dest.name+(S.dest.entrance?' 입구':'');
+  $('#walkIc').textContent=t[0];
+  $('#walkText').textContent=text;
+  $('#walkSub').textContent=`${S.walkIdx+1}/${n} · 남은 거리 ${fmtM(remainFrom(S.walkIdx))} · 전체 ${fmtM(w.totalDistance)}, 약 ${Math.max(1,Math.round(w.totalTime/60))}분`;
+  $('#walkTop').textContent=S.walkWhole?'목적지까지 걷기':startLabel()+' → 목적지';
+  $('#walkPrev').disabled=S.walkIdx===0;
+  $('#walkNext').textContent=S.walkIdx===n-1?'안내 끝내기':'다음';
+  if(map&&mk.step){ const p=new naver.maps.LatLng(st.pos.lat,st.pos.lng); mk.step.setPosition(p); if(!S.followMe) map.panTo(p); }
+}
+$('#walkPrev').onclick=()=>{ if(S.walkIdx>0){ S.walkIdx--; renderWalk(); } };
+$('#walkNext').onclick=()=>{ if(S.walkIdx<S.walk.steps.length-1){ S.walkIdx++; renderWalk(); return; } if(confirm('길안내를 끝낼까요?')) goHome(); };
+$('#btnMyLoc').onclick=()=>{ if(!S.me){ toast('내 위치를 찾는 중입니다.','잠시 후 다시 누르세요. 위치 권한이 꺼져 있으면 ‘다음’ 버튼으로 따라가세요.'); return; }
+  S.followMe=true; map.setCenter(new naver.maps.LatLng(S.me.lat,S.me.lng)); map.setZoom(18); };
+
+/* ---------- 위치 추적 · 자동 진행 · 경로이탈 재안내 ---------- */
+function startWatch(){ stopWatch(); if(!navigator.geolocation) return;
+  watchId=navigator.geolocation.watchPosition(onPos,e=>{ if(S.gpsWarned) return; S.gpsWarned=true;
+    toast(e.code===1?'위치 권한이 꺼져 있어 내 위치를 표시할 수 없습니다.':'내 위치를 찾지 못하고 있습니다.','‘다음’ 버튼을 눌러 안내를 따라가세요.',7000); },
+    {enableHighAccuracy:true,maximumAge:2000,timeout:20000}); }
+function stopWatch(){ if(watchId!=null&&navigator.geolocation){ navigator.geolocation.clearWatch(watchId); } watchId=null; S.followMe=false; }
+async function onPos(p){
+  const me={lat:p.coords.latitude,lng:p.coords.longitude},acc=p.coords.accuracy||50; S.me=me;
+  if(!map||!mk.me) return;
+  const ll=new naver.maps.LatLng(me.lat,me.lng); mk.me.setPosition(ll); mk.me.setVisible(true);
+  const h=p.coords.heading,arrow=document.getElementById('meArrow'),dot=document.getElementById('meDot');
+  if(arrow&&dot){ if(h!=null&&!isNaN(h)&&(p.coords.speed||0)>0.3){ arrow.style.display='block'; dot.style.transform=`translate(-50%,-50%) rotate(${h}deg)`; } else arrow.style.display='none'; }
+  if(S.followMe) map.panTo(ll);
+  const w=S.walk; if(!w) return;
+  const nxt=w.steps[S.walkIdx+1];
+  if(nxt&&dist(me,nxt.pos)<Math.max(ARRIVE_M,Math.min(acc,30))){ S.walkIdx++; renderWalk(); if(navigator.vibrate) navigator.vibrate(200); }
+  if(dist(me,S.dest.pos)<25&&S.walkIdx<w.steps.length-1){ S.walkIdx=w.steps.length-1; renderWalk(); }
+  if(acc>40) return;
+  let dmin=1e9; for(let k=0;k<w.line.length-1;k++){ const d=distToSeg(me,w.line[k],w.line[k+1]); if(d<dmin) dmin=d; }
+  offCount=dmin>OFFROUTE_M?offCount+1:0;
+  if(offCount>=3&&Date.now()-lastReroute>30000&&navigator.onLine){
+    lastReroute=Date.now(); offCount=0; toast('길을 벗어났습니다.','현재 위치에서 다시 안내합니다.',4000);
+    try{ const nw=await tmapWalk(me,S.dest.pos,S.dest.name); Object.assign(S,{walk:nw,walkFrom:me,walkIdx:0,walkWhole:true}); drawMap(); renderWalk(); }
+    catch(e){ toast('다시 안내하지 못했습니다.','지도의 파란 선을 따라 계속 가세요.',6000); }
+  }
+}
+
+/* =========================================================
+   운영자 점검 (#check) – 실제 API로 연동 확인
+   ========================================================= */
+async function runCheck(){
+  const out=[]; const row=(name,ok,msg)=>out.push(`<li><b>${name}</b><span class="${ok?'okc':'ngc'}">${ok?'정상':'실패'}</span> ${esc(msg)}</li>`);
+  $('#chkList').innerHTML='<li>점검 중…</li>';
+  row('접속 주소',location.protocol==='https:'||location.hostname==='localhost',location.origin+(location.protocol==='https:'?'':' — HTTPS가 아니면 GPS가 작동하지 않습니다'));
+  row('config.js 키 입력',CFG.NAVER_KEY_ID&&CFG.ODSAY_API_KEY&&CFG.TMAP_APP_KEY,`네이버 ${CFG.NAVER_KEY_ID?'있음':'없음'} · ODsay ${CFG.ODSAY_API_KEY?'있음':'없음'} · TMAP ${CFG.TMAP_APP_KEY?'있음':'없음'}`);
+  let a,b;
+  try{ const l=await tmapPoi('서울역'); a=l[0]; row('TMAP 장소 검색',!!a,a?`‘서울역’ → ${a.name}`:'결과 없음'); }catch(e){ row('TMAP 장소 검색',false,e.message+' '+e.next); }
+  try{ const l=await tmapPoi('서울시청'); b=l[0]; }catch(e){}
+  if(a&&b){
+    try{ const ps=await odsayPath(a.pos,b.pos); const sel=chooseRoutes(ps); row('ODsay 대중교통 경로',!!sel,sel?`서울역→서울시청 ${sel.main.info.totalTime}분, 후보 ${ps.length}개 중 1개 선정`:'경로 없음'); }
+    catch(e){ row('ODsay 대중교통 경로',false,e.message+' '+e.next); }
+    try{ const w=await tmapWalk(a.pos,b.pos,'서울시청'); row('TMAP 도보 경로',true,`${fmtM(w.totalDistance)}, 안내 ${w.steps.length}개`); }
+    catch(e){ row('TMAP 도보 경로',false,e.message+' '+e.next); }
+  } else row('경로 점검',false,'장소 검색이 실패해 건너뜀');
+  try{ await loadNaver(); row('네이버 지도',true,'불러오기 성공 (인증 실패 시 화면 하단에 별도 안내)'); }catch(e){ row('네이버 지도',false,e.message); }
+  try{ await getGps(); row('GPS',true,'현재 위치 확인됨'); }catch(e){ row('GPS',false,e.message); }
+  $('#chkList').innerHTML=out.join('');
+}
+$('#btnRecheck').onclick=runCheck;
+
+/* ---------- 연결 상태 · 시작 ---------- */
+function netState(){ $('#offline').classList.toggle('hidden',navigator.onLine); }
+window.addEventListener('offline',netState); window.addEventListener('online',netState); netState();
+if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+if(location.hash==='#check'){ stack.push('check'); show('check',false); runCheck(); }
+else if(!CFG.NAVER_KEY_ID||!CFG.ODSAY_API_KEY||!CFG.TMAP_APP_KEY){ show('noconfig',false); }
+else{ stack.push('home'); try{ history.replaceState({id:'home'},''); }catch(e){} renderRecent(); refreshGps(); }
+</script>
+</body>
+</html>
