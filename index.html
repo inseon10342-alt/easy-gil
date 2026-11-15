@@ -126,6 +126,16 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .exit.door .lab{font-size:24px}
 .exit.unk .num{background:var(--soft);color:var(--danger);font-size:22px;letter-spacing:0;padding:0 14px}
 .unknown{color:var(--danger);font-weight:800}
+.stopcard{border-top:2px solid var(--ink);margin-top:4px}
+.sc-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.sc-row .k{flex:0 0 auto;font-size:17px;font-weight:700;color:var(--muted)}
+.sc-row .v{flex:1;min-width:0;text-align:right;font-size:26px;font-weight:900;letter-spacing:-.4px}
+.sc-row .v.num{font-size:32px;color:var(--navy)}
+.sc-row .v.sm{font-size:20px;font-weight:800}
+.sc-row .v .chip{font-size:22px;padding:2px 10px;margin:0}
+.pano{margin-top:14px}
+#stopPanoView{width:100%;height:190px;border-radius:12px;overflow:hidden;background:var(--soft)}
+.pano .cap{font-size:14px;color:var(--muted);margin-top:6px}
 .btn-nmap{background:#03C75A;color:#fff;margin-top:20px;min-height:72px;font-size:22px}
 .btn-nmap:active{background:#02a84c}
 .btn-nmap:disabled{background:var(--soft);color:var(--muted);opacity:1}
@@ -599,9 +609,19 @@ function buildSteps(p){
           ${prevT.trafficType===1&&hasVal(prevT.door)?fact('빠른 환승 칸',esc(prevT.door)):''}</div>
           <p class="tip">‘${esc(lineName(s))}’ 갈아타는 곳 표지판을 따라가세요.</p>`});
       } else {
-        steps.push({kick:'정류장으로',html:`<div class="hero"><em>${esc(s.startName)}</em> 정류장으로 가세요</div>
-          ${prevT.trafficType===1?exitBlock(prevT.endExitNo,'나갈 출구'):''}
-          <div class="facts">${fact('걷는 시간',walkBefore?'약 '+(walkBefore.sectionTime||0)+'분 · '+fmtM(walkBefore.distance||0):UNKNOWN,true)}</div>`});
+        const walkTxt=walkBefore?'약 '+(walkBefore.sectionTime||0)+'분 · '+fmtM(walkBefore.distance||0):UNKNOWN;
+        const stop=busStopInfo(s);
+        if(prevT.trafficType===1){
+          // ① 출구 번호 크게 → '출구로 나왔어요'
+          steps.push({kick:'출구로 나가기',next:'출구로 나왔어요',html:`<div class="hero">${hasVal(prevT.endExitNo)?`<em>${esc(prevT.endExitNo)}번 출구</em>로 나가세요`:'역 밖으로 나가세요'}</div>
+            ${exitBlock(prevT.endExitNo,'나갈 출구')}
+            <p class="tip">출구 밖으로 나오면 <b>‘출구로 나왔어요’</b>를 누르세요. 버스 타는 곳까지 길을 알려 드립니다.</p>`});
+        }
+        // ② 정류장 찾아가기 (정류장 정보 크게 + 네이버지도 도보 길찾기 + 거리뷰 사진)
+        const from=prevT.trafficType===1
+          ? (hasVal(prevT.endExitX)&&hasVal(prevT.endExitY)?{pos:{lat:+prevT.endExitY,lng:+prevT.endExitX},name:prevT.endName+'역 '+(hasVal(prevT.endExitNo)?prevT.endExitNo+'번 출구':'출구'),kind:'exit'}:null)
+          : {pos:{lat:+prevT.endY,lng:+prevT.endX},name:prevT.endName+' 정류장',kind:'stop'};
+        steps.push({kick:'버스 타는 곳 찾기',html:stopCardHtml(stop,walkTxt,from),onShow:()=>bindStopCard(stop,from)});
       }
     }
     // 3) 탑승
@@ -612,13 +632,15 @@ function buildSteps(p){
         ${fastDoor?fact('빠른 환승 칸',esc(fastDoor)+' <small style="font-size:15px;font-weight:600;color:var(--muted)">('+esc(T[k+1].s.startName)+'역 환승)</small>',true):''}
         ${fact('가는 역 수',s.stationCount+'개 역')}${fact('타는 시간','약 '+s.sectionTime+'분')}</div>`});
       steps.push({kick:'내리기',html:`<div class="hero"><em>${esc(s.endName)}역</em>에서 내리세요</div>
-        ${isLast?exitBlock(s.endExitNo,'나갈 출구'):''}
+        ${isLast||(T[k+1]&&T[k+1].s.trafficType===2)?exitBlock(s.endExitNo,'나갈 출구'):''}
         <div class="facts">${fact('타고 온 노선',esc(lineName(s)),true)}</div>
+        ${!isLast&&T[k+1]&&T[k+1].s.trafficType===2?'<p class="tip">내린 뒤 버스로 갈아탑니다. 다음 화면에서 버스 타는 곳까지 안내합니다.</p>':''}
         ${isLast?'<p class="tip">다음 화면부터 출구에서 목적지까지 지도로 안내합니다.</p>':''}`});
     } else {
-      const l=s.lane?.[0]||{};
+      const l=s.lane?.[0]||{}, bst=busStopInfo(s);
       steps.push({kick:'버스 타기',html:`<div class="hero"><em>${esc(s.startName)}</em> 정류장에서<br>${chip(s)} 타세요</div>
         <div class="facts">${fact('버스 번호',esc(l.busNo||'')+'번')}${hasVal(s.startArsID)?fact('정류장 번호',esc(s.startArsID)):''}
+        ${fact('가는 방향',bst.dir?esc(bst.dir)+' 쪽':UNKNOWN,true)}
         ${fact('내릴 정류장',esc(s.endName),true)}${fact('가는 정류장 수',s.stationCount+'개')}${fact('타는 시간','약 '+s.sectionTime+'분')}</div>`});
       steps.push({kick:'버스 내리기',html:`<div class="hero"><em>${esc(s.endName)}</em> 정류장에서 내리세요</div>
         <div class="facts">${fact('타고 온 버스',esc(l.busNo||'')+'번',true)}</div>
@@ -633,6 +655,54 @@ function buildSteps(p){
   const lw=sp[sp.length-1]; S.walkSeg=lw&&lw.trafficType===3?{dist:lw.distance||0,min:lw.sectionTime||0}:null;
   S.steps=steps;
 }
+function busStopInfo(s){
+  const l=s.lane?.[0]||{}, st=s.passStopList?.stations||[];
+  const nxt=st.length>1?st[1].stationName:null;
+  return {name:s.startName, ars:hasVal(s.startArsID)?String(s.startArsID):null, bus:l.busNo||null, seg:s,
+    dir:nxt?('다음 정류장 '+nxt):null, pos:hasVal(s.startX)&&hasVal(s.startY)?{lat:+s.startY,lng:+s.startX}:null};
+}
+function stopCardHtml(b,walkTxt,from){
+  return `<div class="hero"><em>${esc(b.name)}</em><br>정류장으로 걸어가세요</div>
+    <div class="stopcard">
+      <div class="sc-row"><span class="k">정류장</span><span class="v">${esc(b.name)}</span></div>
+      <div class="sc-row"><span class="k">정류장 번호</span><span class="v num">${b.ars?esc(b.ars):UNKNOWN}</span></div>
+      <div class="sc-row"><span class="k">탈 버스</span><span class="v">${chip(b.seg)}</span></div>
+      <div class="sc-row"><span class="k">가는 방향</span><span class="v sm">${b.dir?esc(b.dir)+' 쪽':UNKNOWN}</span></div>
+      <div class="sc-row"><span class="k">걷기</span><span class="v sm">${walkTxt}</span></div>
+    </div>
+    <button class="btn btn-nmap" id="btnStopNmap" type="button" ${b.pos?'':'disabled'}>정류장까지 길찾기 (네이버지도)</button>
+    <p class="tip">${!b.pos?'정류장 위치 정보가 없어 길찾기를 할 수 없습니다. 정류장 번호 표지판을 찾아 주세요.'
+      : from?(from.kind==='exit'?'출구에서 정류장까지 횡단보도를 포함한 걷는 길을 네이버지도 앱으로 안내합니다.':'내린 곳에서 정류장까지 걷는 길을 네이버지도 앱으로 안내합니다.')
+      :'출구 위치 정보가 없어 <b>현재 위치</b>에서 정류장까지 안내합니다.'} 정류장에 도착하면 <b>‘다음’</b>을 누르세요.</p>
+    <div class="pano hidden" id="stopPano"><div id="stopPanoView"></div><div class="cap">정류장 주변 거리 사진 (네이버 거리뷰 · 촬영 시점에 따라 다를 수 있음)</div></div>`;
+}
+async function bindStopCard(b,from){
+  const btn=$('#btnStopNmap');
+  if(btn&&b.pos) btn.onclick=async()=>{
+    let st=from;
+    if(!st){ loading(true,'현재 위치 확인 중…'); try{ const g=await getGps(); st={pos:g,name:'현재 위치',kind:'gps'}; }catch(e){ loading(false); showErr(e); return; } loading(false); }
+    openNaverWalk(st,{pos:b.pos,name:b.name+' 정류장'});
+  };
+  if(b.pos) showStopPano(b.pos);
+}
+async function showStopPano(pos){
+  const box=$('#stopPano'); if(!box||!navigator.onLine) return;
+  try{
+    await loadNaver();
+    for(let i=0;i<40&&!naver.maps.Panorama;i++) await new Promise(r=>setTimeout(r,200));
+    if(!naver.maps.Panorama||!document.getElementById('stopPanoView')) return;
+    const target=new naver.maps.LatLng(pos.lat,pos.lng);
+    const pano=new naver.maps.Panorama('stopPanoView',{position:target,pov:{pan:0,tilt:0,fov:100},
+      aroundControl:false,flightSpot:false,zoomControl:false,logoControl:true});
+    naver.maps.Event.addListener(pano,'pano_status',st=>{
+      if(st!=='OK'){ box.classList.add('hidden'); return; }
+      box.classList.remove('hidden');
+      try{ const c=pano.getLocation().coord, here={lat:c.lat(),lng:c.lng()}; pano.setPov({pan:bearing(here,pos),tilt:0,fov:100}); }catch(e){}
+    });
+  }catch(e){ box.classList.add('hidden'); }
+}
+function bearing(a,b){ const r=x=>x*Math.PI/180, y=Math.sin(r(b.lng-a.lng))*Math.cos(r(b.lat)),
+  x=Math.cos(r(a.lat))*Math.sin(r(b.lat))-Math.sin(r(a.lat))*Math.cos(r(b.lat))*Math.cos(r(b.lng-a.lng)); return (Math.atan2(y,x)*180/Math.PI+360)%360; }
 function renderProg(cur,total){ $('#prog').innerHTML=Array.from({length:total},(_,k)=>`<i class="${k<=cur?'on':''}"></i>`).join(''); }
 function renderStep(){
   const st=S.steps[S.idx], total=S.steps.length+1;
@@ -640,7 +710,8 @@ function renderStep(){
   renderProg(S.idx,total);
   $('#stepBody').innerHTML=`<div class="kick">${st.kick}</div>`+st.html; $('#stepBody').scrollTop=0;
   $('#stepPrev').disabled=S.idx===0;
-  $('#stepNext').textContent=S.idx===S.steps.length-1?'지도로 걷기 안내':'다음';
+  $('#stepNext').textContent=st.next||(S.idx===S.steps.length-1?'지도로 걷기 안내':'다음');
+  if(st.onShow) st.onShow();
 }
 $('#stepPrev').onclick=()=>{ if(S.idx>0){ S.idx--; renderStep(); } };
 $('#stepNext').onclick=async()=>{ if(S.idx<S.steps.length-1){ S.idx++; renderStep(); return; } await startWalk(S.walkStart.pos,false); };
@@ -654,7 +725,7 @@ function loadNaver(){
   if(naverLoading) return naverLoading;
   naverLoading=new Promise((res,rej)=>{
     const s=document.createElement('script'), fail=()=>{ naverLoading=null; s.remove(); rej(new UserError('지도를 불러오지 못했습니다.','인터넷 연결을 확인하고 다시 시도하세요.')); };
-    s.src='https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId='+encodeURIComponent(CFG.NAVER_KEY_ID)+'&submodules=geocoder';
+    s.src='https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId='+encodeURIComponent(CFG.NAVER_KEY_ID)+'&submodules=geocoder,panorama';
     s.onload=()=>window.naver?.maps?res():fail(); s.onerror=fail; document.head.appendChild(s);
     setTimeout(()=>{ if(!window.naver?.maps) fail(); },TIMEOUT_MS);
   });
